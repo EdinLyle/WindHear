@@ -1,0 +1,181 @@
+.changelog-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 32px 60px;
+}
+
+.changelog-header {
+  margin-bottom: 36px;
+}
+
+.changelog-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px;
+}
+
+.changelog-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.changelog-loading,
+.changelog-error {
+  text-align: center;
+  padding: 60px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.changelog-error {
+  color: #dc2626;
+}
+
+.changelog-timeline {
+  position: relative;
+  padding-left: 20px;
+  border-left: 2px solid #e5e7eb;
+}
+
+/* ===== 版本区域 ===== */
+.changelog-version {
+  position: relative;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.changelog-version:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+/* 大版本时间线圆点 - 蓝色大圆 */
+.changelog-version--major::before {
+  content: '';
+  position: absolute;
+  left: -27px;
+  top: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #5d8fff;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #5d8fff;
+}
+
+/* 小版本时间线圆点 - 灰色小圆 */
+.changelog-version--minor::before {
+  content: '';
+  position: absolute;
+  left: -25px;
+  top: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d1d5db;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #d1d5db;
+}
+
+/* ===== 版本头部 ===== */
+.changelog-version-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.changelog-version-header:hover .changelog-version-badge {
+  filter: brightness(1.05);
+}
+
+/* 大版本badge - 蓝色加粗 */
+.changelog-version-badge--major {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: #5d8fff;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+}
+
+/* 小版本badge - 浅灰 */
+.changelog-version-badge--minor {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 5px;
+  letter-spacing: 0.2px;
+}
+
+.changelog-version-date {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ===== 折叠图标 ===== */
+.changelog-collapse-icon {
+  margin-left: auto;
+  font-size: 12px;
+  color: #9ca3af;
+  transition: transform 0.2s ease;
+}
+
+.changelog-collapse-icon--open {
+  transform: rotate(90deg);
+}
+
+/* ===== 变更列表 ===== */
+.changelog-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  max-height: 2000px;
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+  opacity: 1;
+}
+
+.changelog-changes--collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  transition: max-height 0.25s ease, opacity 0.15s ease;
+}
+
+.changelog-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.changelog-type-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.changelog-item-text {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+}

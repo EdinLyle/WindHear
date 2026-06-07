@@ -1,0 +1,383 @@
+[
+  {
+    "version": "V1.6.1",
+    "date": "2026-06-07",
+    "changes": [
+      { "type": "new", "text": "新增 实时审计监控运行中任务实时显示发现的问题（pipeline各阶段增量写入findings到DB）" },
+      { "type": "fix", "text": "修复 实时监控同类任务展开互不阻塞（taskId改为模块前缀+ID复合键，消除React key冲突）" },
+      { "type": "new", "text": "新增 任务暂停/恢复功能（代码审计/Skills审计/MCP扫描支持暂停、恢复、断点续传）" },
+      { "type": "new", "text": "新增 task_checkpoints表存储任务断点数据，支持异常中断后恢复到断点位置继续执行" },
+      { "type": "new", "text": "新增 实时监控TaskCard暂停/恢复操作按钮，paused状态独立样式展示" },
+      { "type": "improve", "text": "优化 代码审计findings增量写入（Hunter/Validator阶段实时写入，去重改为DB层面执行）" },
+      { "type": "improve", "text": "优化 Skills审计Agent完成后实时写入findings，aggregating阶段改为DB层面去重" },
+      { "type": "improve", "text": "优化 MCP扫描AI审计/可利用性复核阶段增量写入findings" },
+      { "type": "fix", "text": "修复 PDF报告封面原始文件显示'-'（全链路传递originalFilename从前端到DB到PDF）" }
+    ]
+  },
+  {
+    "version": "V1.5.9",
+    "date": "2026-06-06",
+    "changes": [
+      { "type": "fix", "text": "修复 模型设置systemPrompt为空时保存报错（Zod schema改为nullable兼容null值）" },
+      { "type": "fix", "text": "修复 实时审计监控任务完成后消失（aggregateData移除isRunning条件，返回所有状态任务）" },
+      { "type": "fix", "text": "修复 实时审计监控评估任务不显示findings（查询evaluation_items中evaluatorScore=1记录）" },
+      { "type": "fix", "text": "修复 实时监控tab选项卡筛选不生效（添加moduleId有效性验证+后端字段映射taskName→name, stage→progressStage）" },
+      { "type": "improve", "text": "优化 实时监控分区展示运行中和已完成任务" }
+    ]
+  },
+  {
+    "version": "V1.5.8",
+    "date": "2026-06-05",
+    "changes": [
+      { "type": "fix", "text": "修复 PDF代码片段内容用省略号截断问题，改为逐字符折行完整显示所有代码" },
+      { "type": "fix", "text": "修复 PDF代码块跨页显示，支持长代码片段自动分页绘制" },
+      { "type": "fix", "text": "修复 MCP评估PDF导出confidence字段类型错误导致报告崩溃" },
+      { "type": "fix", "text": "修复 代码审计/Skills审计PDF代码块行叠加和内容截断问题" }
+    ]
+  },
+  {
+    "version": "V1.5.7",
+    "date": "2026-06-04",
+    "changes": [
+      { "type": "fix", "text": "修复 四个PDF报告封面风险评分与严重度分布条重叠" },
+      { "type": "fix", "text": "修复 PDF报告中漏洞代码/参考修复代码标签重复显示问题" },
+      { "type": "fix", "text": "修复 MCP评估PDF代码片段标签重复显示" },
+      { "type": "improve", "text": "优化 PDF三级标题（影响/利用方式/修复方式/证据/修复建议）内容换行显示" },
+      { "type": "refactor", "text": "重构 drawCodeBlock支持label可选参数，跨页分页绘制，精确宽度计算" }
+    ]
+  },
+  {
+    "version": "V1.5.6",
+    "date": "2026-06-02",
+    "changes": [
+      { "type": "refactor", "text": "重构 四个PDF报告字体体系：宋体简体(正文)+方正风雅宋(标签标题)+TNR(英文数字)+航天腾飞体(封面等级)" },
+      { "type": "refactor", "text": "重构 PDF字号体系为中国标准字号（二号/三号/小三/四号/小四/五号）" },
+      { "type": "improve", "text": "优化 PDF表格标签用方正风雅宋+居中留白75%宽度" },
+      { "type": "improve", "text": "优化 PDF封面标题二号航天腾飞体居中，一级标题三号居中" },
+      { "type": "fix", "text": "修复 PDF导出Honk Variable Font导致PDF损坏无法打开" },
+      { "type": "fix", "text": "修复 PDF报告中文文件名乱码（RFC 5987 Content-Disposition编码）" }
+    ]
+  },
+  {
+    "version": "V1.5.5",
+    "date": "2026-06-01",
+    "changes": [
+      { "type": "new", "text": "新增 Anthropic Provider全栈支持（模型设置/评估中心/代码审计/MCP扫描/Skills审计）" },
+      { "type": "improve", "text": "优化 模型评估报告通过/未通过字号改为四号" },
+      { "type": "improve", "text": "优化 MCP评估报告状态字段英文转中文显示" },
+      { "type": "fix", "text": "修复 代码审计报告封面评分与严重度分布重叠" },
+      { "type": "fix", "text": "修复 Skills审计报告风险类别字号与Agent统计不一致" }
+    ]
+  },
+  {
+    "version": "V1.5.4",
+    "date": "2026-05-30",
+    "changes": [
+      { "type": "improve", "text": "优化 导出文件名从基于ID改为基于任务名称（MD/HTML/PDF四种报告类型），新增sanitizeFilename辅助函数" },
+      { "type": "refactor", "text": "重构 创建server/pdfCommon.ts公共模块，4个PDF报告生成器统一使用公共模块" },
+      { "type": "new", "text": "新增 实时监控SSE功能（auditMonitor.ts SSE连接管理与数据聚合，4个pipeline集成broadcastUpdate()）" },
+      { "type": "new", "text": "新增 后端SSE端点和轮询端点" },
+      { "type": "new", "text": "新增 前端实时监控组件和路由，导航菜单集成" },
+      { "type": "refactor", "text": "重构 ModelSettings页面分拆为四个选项卡（模型评估/MCP评估/代码审计/Skills审计独立配置）" }
+    ]
+  },
+  {
+    "version": "V1.5.3",
+    "date": "2026-05-28",
+    "changes": [
+      { "type": "new", "text": "新增 智谱GLM模型全栈集成，支持模型设置、评估中心、代码审计、MCP扫描、Skills审计" },
+      { "type": "new", "text": "新增 超时设置功能，模型设置4个选项卡和评估中心4个新建页面均可配置超时时间(10~600秒)" },
+      { "type": "improve", "text": "优化 后端9处硬编码超时全部改为从配置读取，支持按模块独立设置超时" },
+      { "type": "improve", "text": "优化 版本号动态读取，系统右上角版本号自动同步最新更新日志" }
+    ]
+  },
+  {
+    "version": "V1.5.2",
+    "date": "2026-05-27",
+    "changes": [
+      { "type": "new", "text": "新增 更新日志模块（时间线展示、6种标签、大小版本折叠）" },
+      { "type": "new", "text": "新增 右上角版本号可点击跳转更新日志页，带小红点提示" },
+      { "type": "fix", "text": "修复 模型设置清空系统提示词后未真正持久化（后端schema拒绝空值+前端回退默认值）" },
+      { "type": "fix", "text": "修复 侧边栏导航高亮逻辑（评估中心与评估管理区分）" },
+      { "type": "fix", "text": "修复 PDF导出JSON解析错误（MCP评估/代码审计报告）" },
+      { "type": "ui", "text": "优化 Skills风险类别分布图表：Treemap改为横向条形图，显示类别名称" },
+      { "type": "security", "text": "修复 模型设置POST端点systemPrompt校验过严导致清空失败的安全策略问题" }
+    ]
+  },
+  {
+    "version": "V1.5.1",
+    "date": "2026-05-26",
+    "changes": [
+      { "type": "new", "text": "新增 系统提示词三层增强架构（Layer1角色定义+Layer2格式规范+Layer3用户策略）" },
+      { "type": "new", "text": "新增 系统提示词说明卡片（功能定位+影响说明+生效流程+内容建议+示例）" },
+      { "type": "new", "text": "新增 清空系统提示词按钮（确认对话框+红色边框样式）" },
+      { "type": "improve", "text": "优化 代码审计3个Agent（Parser/Hunter/Validator）消息结构改为system+user双层" },
+      { "type": "security", "text": "优化 MCP评估 runAiAudit 系统提示词从||替代改为拼接增强，保留内置策略" },
+      { "type": "security", "text": "优化 MCP评估 reviewExploitability 补接入自定义系统提示词参数" },
+      { "type": "ui", "text": "优化 模型设置选项卡样式，切换更流畅" }
+    ]
+  },
+  {
+    "version": "V1.5.0",
+    "date": "2026-05-24",
+    "changes": [
+      { "type": "new", "text": "新增 Skills 安全审计模块全栈开发（上传/分析/报告/PDF导出）" },
+      { "type": "new", "text": "新增 Skills审计10个专业Agent（按风险类别自动分配）" },
+      { "type": "new", "text": "新增 Skills审计正则预扫描阶段（regexScan），快速识别硬编码密钥和敏感信息" },
+      { "type": "new", "text": "新增 Skills审计详情页（漏洞列表/严重度分布/风险类别/代码定位/状态管理）" },
+      { "type": "fix", "text": "修复 Dashboard Skills严重度分布和风险类别分布图表无数据问题" },
+      { "type": "ui", "text": "新增 Skills审计列表页（分页/搜索/状态筛选）" }
+    ]
+  },
+  {
+    "version": "V1.4.2",
+    "date": "2026-05-22",
+    "changes": [
+      { "type": "improve", "text": "优化 代码审计详情页漏洞表格交互（排序/筛选/分页）" },
+      { "type": "ui", "text": "优化 侧边栏导航重构，评估中心子菜单支持展开折叠" },
+      { "type": "fix", "text": "修复 代码审计大文件切片导致内存溢出问题" },
+      { "type": "refactor", "text": "重构 评估中心页面拆分为独立列表组件（模型评估/MCP/代码审计/Skills）" },
+      { "type": "ui", "text": "优化 快速启动页面增加4个评估入口卡片" }
+    ]
+  },
+  {
+    "version": "V1.4.1",
+    "date": "2026-05-20",
+    "changes": [
+      { "type": "new", "text": "新增 漏洞知识库管理（CWE模式增删查，内置OWASP Top 10预置数据）" },
+      { "type": "new", "text": "新增 代码审计4Agent架构（Parser标记→Hunter挖掘→Validator验证→Reporter汇总）" },
+      { "type": "improve", "text": "优化 代码审计流水线并发控制，Parser阶段支持并行处理切片" },
+      { "type": "fix", "text": "修复 代码审计报告PDF中文乱码（内嵌NotoSansSC字体）" },
+      { "type": "security", "text": "优化 Hunter Agent增加CWE知识库匹配，减少误报率" }
+    ]
+  },
+  {
+    "version": "V1.4.0",
+    "date": "2026-05-18",
+    "changes": [
+      { "type": "new", "text": "新增 代码安全审计模块（上传ZIP/分析/报告/PDF导出）" },
+      { "type": "new", "text": "新增 代码预处理器（语言识别+文件过滤+切片器，支持10+语言）" },
+      { "type": "new", "text": "新增 代码审计详情页（漏洞列表/严重度统计/代码定位/状态管理）" },
+      { "type": "new", "text": "新增 代码审计列表页（分页/搜索/语言筛选）" },
+      { "type": "ui", "text": "新增 评估管理增加新建按钮和搜索筛选功能" }
+    ]
+  },
+  {
+    "version": "V1.3.3",
+    "date": "2026-05-14",
+    "changes": [
+      { "type": "improve", "text": "优化 MCP评估报告详情页漏洞卡片布局和代码高亮样式" },
+      { "type": "fix", "text": "修复 MCP评估大项目扫描时进度不更新问题" },
+      { "type": "fix", "text": "修复 评估中心页面切换时数据残留问题" },
+      { "type": "ui", "text": "优化 MCP评估新建页面增加项目信息预览" }
+    ]
+  },
+  {
+    "version": "V1.3.2",
+    "date": "2026-05-10",
+    "changes": [
+      { "type": "improve", "text": "优化 评估管理页面整合（模型评估/MCP评估统一列表展示）" },
+      { "type": "improve", "text": "优化 评估报告PDF导出功能（MCP/模型评估统一模板）" },
+      { "type": "fix", "text": "修复 MCP评估报告严重度统计与实际不一致" },
+      { "type": "ui", "text": "优化 MCP评估详情页漏洞项卡片样式，增加代码高亮" },
+      { "type": "refactor", "text": "重构 后端评估API路径规范化" }
+    ]
+  },
+  {
+    "version": "V1.3.1",
+    "date": "2026-05-06",
+    "changes": [
+      { "type": "new", "text": "新增 模型设置支持Ollama/OpenAI/Anthropic三平台Provider" },
+      { "type": "new", "text": "新增 MCP评估可利用性复核阶段（reviewExploitability），降低误报" },
+      { "type": "improve", "text": "优化 MCP评估AI审计提示词，增加结构化输出约束" },
+      { "type": "fix", "text": "修复 Anthropic API调用消息格式兼容问题" },
+      { "type": "security", "text": "优化 MCP评估扫描结果增加置信度评分" }
+    ]
+  },
+  {
+    "version": "V1.3.0",
+    "date": "2026-04-30",
+    "changes": [
+      { "type": "new", "text": "新增 MCP 风险评估模块（上传ZIP/分析/报告/PDF导出）" },
+      { "type": "new", "text": "新增 MCP AI安全审计阶段（项目感知+代码扫描+漏洞整理）" },
+      { "type": "new", "text": "新增 MCP项目嗅探器（自动识别MCP Server类型和技术栈）" },
+      { "type": "new", "text": "新增 MCP评估详情页（漏洞列表/严重度分布/风险评估/状态管理）" },
+      { "type": "ui", "text": "新增 数据面板增加MCP评估相关图表" }
+    ]
+  },
+  {
+    "version": "V1.2.2",
+    "date": "2026-04-24",
+    "changes": [
+      { "type": "improve", "text": "优化 模型评估报告页面展示（通过率统计/风险分类详情/多轮对话支持）" },
+      { "type": "fix", "text": "修复 模型评估大数据集运行时进度卡死问题" },
+      { "type": "ui", "text": "优化 评估报告通过率进度条组件（三色阈值显示）" },
+      { "type": "refactor", "text": "重构 后端runner.ts评估引擎，支持批量并发调用" }
+    ]
+  },
+  {
+    "version": "V1.2.1",
+    "date": "2026-04-18",
+    "changes": [
+      { "type": "new", "text": "新增 评估报告MD/HTML/PDF三种格式导出" },
+      { "type": "improve", "text": "优化 模型评估提示词模板管理（分类/搜索/自定义）" },
+      { "type": "fix", "text": "修复 评估报告导出中文文件名编码问题" },
+      { "type": "ui", "text": "优化 评估报告详情页展开/收起交互" }
+    ]
+  },
+  {
+    "version": "V1.2.0",
+    "date": "2026-04-12",
+    "changes": [
+      { "type": "new", "text": "新增 评估中心统一管理页面（模型评估列表/新建/搜索/删除/批量操作）" },
+      { "type": "new", "text": "新增 评估报告详情页（评估结果/逐条分析/风险分类统计）" },
+      { "type": "improve", "text": "优化 后端评估流水线支持进度实时查询" },
+      { "type": "fix", "text": "修复 模型评估并发请求导致数据库锁冲突" },
+      { "type": "ui", "text": "优化 评估列表页分页组件（10/25/50/100每页）" }
+    ]
+  },
+  {
+    "version": "V1.1.2",
+    "date": "2026-04-06",
+    "changes": [
+      { "type": "improve", "text": "优化 测试集管理批量操作（多选/批量删除/批量导入）" },
+      { "type": "new", "text": "新增 测试集收藏夹功能（创建/删除/归类收藏）" },
+      { "type": "fix", "text": "修复 测试集导入CSV格式兼容性问题（UTF-8 BOM头处理）" },
+      { "type": "ui", "text": "优化 测试集列表页搜索和风险类型筛选" }
+    ]
+  },
+  {
+    "version": "V1.1.1",
+    "date": "2026-03-31",
+    "changes": [
+      { "type": "new", "text": "新增 模型设置页面（Ollama端点配置/模型选择/系统提示词编辑）" },
+      { "type": "improve", "text": "优化 模型评估运行器支持自定义系统提示词注入" },
+      { "type": "fix", "text": "修复 Ollama连接超时未正确捕获错误" },
+      { "type": "security", "text": "优化 模型设置API密钥脱敏显示" }
+    ]
+  },
+  {
+    "version": "V1.1.0",
+    "date": "2026-03-27",
+    "changes": [
+      { "type": "new", "text": "新增 模型安全评估功能（选择测试集+模型→批量评估→结果分析）" },
+      { "type": "new", "text": "新增 后端评估运行器（runner.ts），支持Ollama模型调用与结果存储" },
+      { "type": "new", "text": "新增 评估新建页面（测试集选择/模型配置/参数设置）" },
+      { "type": "improve", "text": "优化 数据库新增评估相关表结构（evaluations/evaluation_results）" },
+      { "type": "fix", "text": "修复 模型调用超时中断后数据库状态未更新问题" }
+    ]
+  },
+  {
+    "version": "V1.0.0",
+    "date": "2026-03-25",
+    "changes": [
+      { "type": "new", "text": "新增 数据面板（Dashboard）概览统计（评估总数/漏洞统计/严重度分布/趋势图表）" },
+      { "type": "new", "text": "新增 快速启动页面（功能导航/引导式操作流程/driver.js引导组件）" },
+      { "type": "improve", "text": "优化 侧边栏导航支持折叠/展开，品牌标识+版本号显示" },
+      { "type": "ui", "text": "优化 全局主题样式统一，蓝色科技风UI风格" },
+      { "type": "fix", "text": "修复 页面刷新后路由状态丢失问题" }
+    ]
+  },
+  {
+    "version": "V0.9.0",
+    "date": "2026-03-23",
+    "changes": [
+      { "type": "new", "text": "新增 测试集管理页面（Arsenal），支持TC260/通用/自定义三分类展示" },
+      { "type": "new", "text": "新增 测试集CSV导入功能（解析CSV→入库→分类归档）" },
+      { "type": "new", "text": "新增 测试集风险类型/子类型筛选和搜索" },
+      { "type": "improve", "text": "优化 数据库新增prompts/collections表结构，支持测试集CRUD" },
+      { "type": "ui", "text": "新增 测试集列表分页和展开详情交互" }
+    ]
+  },
+  {
+    "version": "V0.8.0",
+    "date": "2026-03-22",
+    "changes": [
+      { "type": "new", "text": "新增 后端SQLite数据库（better-sqlite3），初始化schema和迁移机制" },
+      { "type": "new", "text": "新增 后端API路由框架（Express + CORS + 静态文件服务）" },
+      { "type": "new", "text": "新增 前端API客户端（src/api.ts），统一封装所有后端接口调用" },
+      { "type": "improve", "text": "优化 前后端TypeScript类型定义统一（src/types.ts）" },
+      { "type": "refactor", "text": "重构 后端入口文件模块化拆分" }
+    ]
+  },
+  {
+    "version": "V0.7.0",
+    "date": "2026-03-21",
+    "changes": [
+      { "type": "new", "text": "新增 React+Vite前端项目脚手架，TypeScript+React Router基础框架" },
+      { "type": "new", "text": "新增 AppLayout全局布局组件（侧边栏+顶栏+内容区）" },
+      { "type": "new", "text": "新增 全局样式和CSS变量体系（科技蓝主题色+暗色侧边栏）" },
+      { "type": "new", "text": "新增 前端路由配置（快速启动/数据面板/测试集/模型设置/评估管理）" },
+      { "type": "improve", "text": "优化 项目构建配置（ESLint+TypeScript+Vite）" }
+    ]
+  },
+  {
+    "version": "V0.6.0",
+    "date": "2026-03-19",
+    "changes": [
+      { "type": "new", "text": "新增 前端页面骨架（Dashboard/Evaluation/Arsenal/Settings占位组件）" },
+      { "type": "new", "text": "新增 React Router路由配置和页面切换" },
+      { "type": "improve", "text": "优化 Vite开发服务器代理配置，连接后端API" },
+      { "type": "ui", "text": "新增 基础侧边栏导航布局原型" }
+    ]
+  },
+  {
+    "version": "V0.5.0",
+    "date": "2026-03-17",
+    "changes": [
+      { "type": "new", "text": "新增 Ollama模型客户端（modelClients.ts），支持chat和completion接口调用" },
+      { "type": "new", "text": "新增 后端模型调用工具函数（超时处理/错误重试/响应解析）" },
+      { "type": "improve", "text": "优化 后端环境变量配置管理（端口号/数据库路径/Ollama地址）" },
+      { "type": "fix", "text": "修复 Ollama流式响应解析边界问题" }
+    ]
+  },
+  {
+    "version": "V0.4.0",
+    "date": "2026-03-15",
+    "changes": [
+      { "type": "new", "text": "新增 Express后端服务器初始化（index.ts），CORS和JSON中间件" },
+      { "type": "new", "text": "新增 后端健康检查端点（/api/health）" },
+      { "type": "improve", "text": "优化 后端TypeScript编译配置和开发热重载（tsx watch）" },
+      { "type": "refactor", "text": "重构 项目目录结构（server/src/static分离）" }
+    ]
+  },
+  {
+    "version": "V0.3.0",
+    "date": "2026-03-13",
+    "changes": [
+      { "type": "new", "text": "新增 数据库schema设计（settings/prompts/evaluations等表结构规划）" },
+      { "type": "new", "text": "新增 better-sqlite3数据库连接和初始化脚本" },
+      { "type": "improve", "text": "优化 数据库迁移机制设计，支持版本递增升级" },
+      { "type": "fix", "text": "修复 SQLite数据库文件路径跨平台兼容问题" }
+    ]
+  },
+  {
+    "version": "V0.2.0",
+    "date": "2026-03-11",
+    "changes": [
+      { "type": "new", "text": "新增 项目需求分析文档，定义核心功能模块（模型评估/MCP审计/代码审计/Skills审计）" },
+      { "type": "new", "text": "新增 系统架构设计（前后端分离+SQLite+多Provider模型调用）" },
+      { "type": "improve", "text": "优化 技术栈选型（React+Vite+Express+better-sqlite3+PDFKit）" },
+      { "type": "ui", "text": "新增 UI原型设计（科技蓝主题色+暗色侧边栏布局方案）" }
+    ]
+  },
+  {
+    "version": "V0.1.0",
+    "date": "2026-03-09",
+    "changes": [
+      { "type": "new", "text": "新增 项目初始化（npm init + 依赖安装）" },
+      { "type": "new", "text": "新增 Git仓库初始化和.gitignore配置" },
+      { "type": "improve", "text": "优化 package.json项目元信息配置" },
+      { "type": "new", "text": "新增 开发依赖配置（TypeScript/ESLint/Prettier）" }
+    ]
+  },
+  {
+    "version": "V0.0.0",
+    "date": "2026-03-07",
+    "changes": [
+      { "type": "new", "text": "新增 听风（WindHear）AI安全评估平台项目立项" },
+      { "type": "new", "text": "新增 项目愿景定义：面向AI模型和MCP服务的全栈安全评估工具" },
+      { "type": "new", "text": "新增 项目名称和Logo设计（听风品牌标识）" }
+    ]
+  }
+]
