@@ -8,7 +8,9 @@
       { "type": "improve", "text": "优化 导出报告文件名统一为 {项目名}-{创建时间}.{ext} 格式，新增buildReportFilename通用函数" },
       { "type": "fix", "text": "修复 Skills审计HTML报告完成时间显示（传入audit参数用completed_at）+ 增加证据和漏洞代码列" },
       { "type": "fix", "text": "修复 模型设置systemPrompt为空时保存报错（Zod schema改为nullable兼容null值）" },
-      { "type": "refactor", "text": "清理 ESLint未使用参数（_regFont/_tnr）" }
+      { "type": "refactor", "text": "清理 ESLint未使用参数（_regFont/_tnr）" },
+      { "type": "improve", "text": "优化 PDF报告正文首行缩进2个中文字符，新增drawBodyText智能正文渲染函数" },
+      { "type": "improve", "text": "优化 PDF报告编号列表自动拆分：挤在一行的编号(如1.xxx,2.xxx)按序号拆为每项一行，编号行不缩进" }
     ]
   },
   {
