@@ -201,8 +201,8 @@ export class CodeAuditStore {
     status?: ItemStatus
   }): Promise<number> {
     const result = await this.db.run(
-      `INSERT INTO code_audit_items (audit_id, slice_id, cwe_id, cwe_name, title, description, file_path, line_start, line_end, vulnerable_code, fix_suggestion, severity, confidence, exploitability, data_flow, poc_description, poc_code, reproduce_steps, fix_code, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO code_audit_items (audit_id, slice_id, cwe_id, cwe_name, title, description, file_path, line_start, line_end, vulnerable_code, fix_suggestion, severity, confidence, exploitability, data_flow, poc_description, poc_code, reproduce_steps, fix_code, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       input.auditId,
       input.sliceId ?? null,
       input.cweId ?? null,

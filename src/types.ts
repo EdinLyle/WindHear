@@ -105,7 +105,7 @@ export type EvaluatorSettings = {
   baseUrl: string
   apiKey: string
   model?: string
-  systemPrompt: string
+  systemPrompt: string | null
   timeoutMs?: number
 }
 

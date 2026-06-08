@@ -220,7 +220,7 @@ export function ModelSettings() {
         model: cfg.model?.trim() || undefined,
         systemPrompt: editSystemPrompt[tab]
           ? newSystemPrompt[tab].trim()
-          : cfg.systemPrompt,
+          : cfg.systemPrompt ?? '',
         timeoutMs: (cfg.timeoutMs ?? defaultTimeouts[tab]) * 1000,
       }
 
