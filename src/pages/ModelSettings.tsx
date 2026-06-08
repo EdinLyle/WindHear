@@ -15,6 +15,7 @@ import {
 } from '../api'
 import type { ModelTabSettings, Provider } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const TABS = [
   { key: 'model-eval', label: '模型评估', desc: '用于模型评估的风险判定模型', settingsKey: 'modelEval' as const },
@@ -117,6 +118,8 @@ export function ModelSettings() {
   const [baseUrlError, setBaseUrlError] = useState<Record<string, string>>({})
   const [editSystemPrompt, setEditSystemPrompt] = useState<Record<string, boolean>>({})
   const [newSystemPrompt, setNewSystemPrompt] = useState<Record<string, string>>({})
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const [clearDialogTab, setClearDialogTab] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -167,8 +170,16 @@ export function ModelSettings() {
   }
 
   async function onClearSystemPrompt(tab: string) {
-    if (!window.confirm('确定要清空系统提示词吗？清空后将使用内置默认规则。')) return
+    setClearDialogTab(tab)
+    setClearDialogOpen(true)
+  }
+
+  async function onConfirmClear() {
+    if (!clearDialogTab) return
+    const tab = clearDialogTab
     const cfg = configs[tab]
+    setClearDialogOpen(false)
+    setClearDialogTab(null)
     setLoading(prev => ({ ...prev, [tab]: true }))
     try {
       const payload: ModelTabSettings = {
@@ -531,6 +542,12 @@ export function ModelSettings() {
           </section>
         )
       })}
+      <ConfirmDialog
+        open={clearDialogOpen}
+        message="确定要清空系统提示词吗？清空后将使用内置默认规则。"
+        onConfirm={onConfirmClear}
+        onCancel={() => { setClearDialogOpen(false); setClearDialogTab(null) }}
+      />
     </div>
   )
 }

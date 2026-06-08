@@ -1,258 +1,198 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// 颜色常量（暗色主题）
-const COLORS = {
-    background: '#0f172a',
-    card: '#1e293b',
-    text: '#f1f5f9',
-    textSecondary: '#94a3b8',
-    critical: '#ef4444',
-    high: '#f97316',
-    medium: '#eab308',
-    low: '#3b82f6',
-    info: '#6b7280',
-    codeBlock: '#0f172a',
-    border: '#334155',
-    green: '#22c55e',
-    purple: '#a78bfa',
-    codeText: '#e2e8f0',
-    descText: '#cbd5e1',
-};
-const SEVERITY_LABELS = {
-    critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息'
-};
+import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawTable, drawSeverityBar, ensureSpace, postProcessPages, SEVERITY_ZH, FONT_SIZES, } from '../pdfCommon.js';
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 /** 风险类别中文标签 */
 const RISK_CATEGORY_LABELS = {
-    dangerous_command: '危险命令', data_exfiltration: '数据泄露', unauthorized_access: '未授权访问',
-    privilege_escalation: '权限提升', code_injection: '代码注入', path_traversal: '路径穿越',
-    social_engineering: '社会工程学', resource_abuse: '资源滥用', information_disclosure: '信息泄露',
-    denial_of_service: '拒绝服务', credential_exposure: '凭证暴露', insecure_communication: '不安全通信',
-    insufficient_validation: '输入验证不足', insecure_defaults: '不安全默认配置',
-    dependency_confusion: '依赖混淆', prompt_injection: '提示注入', tool_poisoning: '工具投毒',
-    context_manipulation: '上下文操控', supply_chain: '供应链攻击', other: '其他',
+    dangerous_command: '危险命令', reverse_shell: '反向Shell', hardcoded_secrets: '硬编码密钥',
+    prompt_injection: '提示注入', data_exfiltration: '数据泄露', sensitive_file_access: '敏感文件访问',
+    dynamic_code_execution: '动态代码执行', privilege_escalation: '权限提升', weak_crypto: '弱加密',
+    command_injection: '命令注入', supply_chain_attack: '供应链攻击', unauthorized_tool_use: '未授权工具使用',
+    trigger_hijacking: '触发器劫持', skill_md_mismatch: 'Skill清单不匹配', code_quality: '代码质量',
+    bytecode_tampering: '字节码篡改', obfuscation: '代码混淆', resource_abuse: '资源滥用',
+    unicode_steganography: 'Unicode隐写', social_engineering: '社会工程学',
+    other: '其他',
 };
-const FONT_REGULAR = 'CN';
-const FONT_BOLD = 'CN-Bold';
-const FONT_MONO = 'Mono';
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
-const MARGIN_TOP = 60;
-const MARGIN_BOTTOM = 60;
-const MARGIN_LEFT = 50;
-const MARGIN_RIGHT = 50;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 /**
  * 生成Skills 安全审计PDF报告并流式输出到HTTP响应
  */
 export function generateSkillsPdfReport(data, res) {
     const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: MARGIN_TOP, bottom: MARGIN_BOTTOM, left: MARGIN_LEFT, right: MARGIN_RIGHT },
+        margins: { top: PAGE.MARGIN_TOP, bottom: PAGE.MARGIN_BOTTOM, left: PAGE.MARGIN_LEFT, right: PAGE.MARGIN_RIGHT },
         bufferPages: true,
         autoFirstPage: false,
         info: {
             Title: `Skills安全审计报告 - ${data.name}`,
             Author: '听风',
             Subject: 'Skills安全审计报告',
-        }
+        },
     });
-    // 注册中文字体
-    const fontsDir = path.join(__dirname, '../fonts');
-    const fontRegular = path.join(fontsDir, 'NotoSansSC-Regular.ttf');
-    const fontBold = path.join(fontsDir, 'NotoSansSC-Bold.ttf');
-    const fontMono = path.join(fontsDir, 'NotoSansMono-Regular.ttf');
-    const hasRegular = fs.existsSync(fontRegular);
-    const hasBold = fs.existsSync(fontBold);
-    const hasMono = fs.existsSync(fontMono);
-    if (hasRegular)
-        doc.registerFont(FONT_REGULAR, fontRegular);
-    if (hasBold)
-        doc.registerFont(FONT_BOLD, fontBold);
-    if (hasMono)
-        doc.registerFont(FONT_MONO, fontMono);
-    const regFont = hasRegular ? FONT_REGULAR : 'Helvetica';
-    const boldFont = hasBold ? FONT_BOLD : (hasRegular ? FONT_REGULAR : 'Helvetica-Bold');
-    const monoFont = hasMono ? FONT_MONO : 'Courier';
-    // 设置响应头
-    const filename = `skills-audit-report-${data.name}-${Date.now()}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    doc.pipe(res);
-    doc.on('pageAdded', () => { fillPageBackground(doc); });
-    // 封面页
-    doc.addPage();
-    drawCoverPage(doc, data, regFont, boldFont);
-    // 风险类别统计页
-    if (Object.keys(data.riskCategoryCount).length > 0) {
-        doc.addPage();
-        fillPageBackground(doc);
-        drawCategoryPage(doc, data, regFont, boldFont);
+    let fonts;
+    try {
+        fonts = registerFonts(doc);
     }
-    // 发现项详情页
-    drawFindingPages(doc, data, regFont, boldFont, monoFont);
-    // 页眉页脚
-    postProcessPages(doc, data, regFont);
-    doc.end();
-}
-function postProcessPages(doc, data, regFont) {
-    const pages = doc.bufferedPageRange();
-    const totalPages = pages.count;
-    for (let i = 0; i < totalPages; i++) {
-        doc.switchToPage(i);
-        const savedY = doc.y;
-        doc.font(regFont).fontSize(8).fillColor(COLORS.textSecondary);
-        doc.text(`听风 | ${data.name}`, MARGIN_LEFT, 25, { lineBreak: false, width: CONTENT_WIDTH, height: 12 });
-        doc.font(regFont).fontSize(8).fillColor(COLORS.textSecondary);
-        doc.text(`${i + 1} / ${totalPages}`, MARGIN_LEFT, PAGE_HEIGHT - 35, { lineBreak: false, width: CONTENT_WIDTH, align: 'center', height: 12 });
-        doc.y = savedY;
-    }
-}
-function ensureSpace(doc, neededHeight) {
-    if (doc.y + neededHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
-        doc.addPage();
-        fillPageBackground(doc);
-    }
-}
-function fillPageBackground(doc) {
-    doc.save();
-    doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT).fill(COLORS.background);
-    doc.restore();
-}
-function drawCoverPage(doc, data, regFont, boldFont) {
-    fillPageBackground(doc);
-    doc.font(boldFont).fontSize(28).fillColor(COLORS.text)
-        .text('Skills 安全审计报告', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.font(regFont).fontSize(14).fillColor(COLORS.textSecondary)
-        .text(data.name, { align: 'center' });
-    doc.moveDown(2);
-    // 评分环
-    const ringSize = 120;
-    const ringX = (PAGE_WIDTH - ringSize) / 2;
-    drawScoreRing(doc, ringX, doc.y, ringSize, data.riskScore, boldFont, regFont);
-    doc.y += ringSize + 20;
-    // 统计卡片
-    const cardW = (CONTENT_WIDTH - 20) / 3;
-    const cardH = 60;
-    const startX = MARGIN_LEFT;
-    const startY = doc.y;
-    const cards = [
-        { label: '发现项总数', value: String(data.findingsCount), color: COLORS.text },
-        { label: 'Skills数量', value: String(data.totalSkills), color: COLORS.purple },
-        { label: '风险等级', value: data.riskLevel || '-', color: data.riskLevel === 'critical' ? COLORS.critical : data.riskLevel === 'high' ? COLORS.high : data.riskLevel === 'medium' ? COLORS.medium : COLORS.green },
-    ];
-    for (let i = 0; i < cards.length; i++) {
-        const card = cards[i];
-        const cx = startX + i * (cardW + 10);
-        doc.roundedRect(cx, startY, cardW, cardH, 6).fill(COLORS.card);
-        doc.font(boldFont).fontSize(22).fillColor(card.color)
-            .text(card.value, cx, startY + 8, { width: cardW, align: 'center' });
-        doc.font(regFont).fontSize(9).fillColor(COLORS.textSecondary)
-            .text(card.label, cx, startY + 38, { width: cardW, align: 'center' });
-    }
-    doc.y = startY + cardH + 16;
-    // 严重度分布条
-    drawSeverityBar(doc, data.severityCount, data.findingsCount, regFont);
-    // 项目信息
-    doc.moveDown(1.5);
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary);
-    const infoLines = [
-        `项目名称: ${data.name}`,
-        `原始文件: ${data.originalFilename}`,
-        `文件数量: ${data.totalFiles}  |  Skills数量: ${data.totalSkills}`,
-        `发现项: ${data.findingsCount}  |  风险等级: ${data.riskLevel || '-'}`,
-    ];
-    for (const line of infoLines) {
-        doc.text(line, { align: 'center' });
-    }
-    doc.moveDown(1.5);
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-        .text(`报告生成时间: ${new Date().toLocaleString('zh-CN')}`, { align: 'center' })
-        .text('听风', { align: 'center' });
-}
-function drawScoreRing(doc, x, y, size, score, boldFont, regFont) {
-    const cx = x + size / 2;
-    const cy = y + size / 2;
-    const radius = size / 2 - 10;
-    const lineW = 8;
-    doc.circle(cx, cy, radius).lineWidth(lineW).strokeColor(COLORS.border).stroke();
-    const scoreVal = Math.min(Math.max(score, 0), 100);
-    const scoreColor = scoreVal >= 70 ? COLORS.critical : scoreVal >= 40 ? COLORS.high : scoreVal >= 20 ? COLORS.medium : COLORS.green;
-    if (scoreVal > 0) {
-        const startAngle = -Math.PI / 2;
-        const endAngle = startAngle + (2 * Math.PI * scoreVal / 100);
-        drawArc(doc, cx, cy, radius, startAngle, endAngle, lineW, scoreColor);
-    }
-    doc.font(boldFont).fontSize(30).fillColor(scoreColor)
-        .text(String(scoreVal), x, cy - 15, { width: size, align: 'center' });
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-        .text('风险评分', x, cy + 18, { width: size, align: 'center' });
-}
-function drawArc(doc, cx, cy, r, startAngle, endAngle, lineW, color) {
-    const startX = cx + r * Math.cos(startAngle);
-    const startY = cy + r * Math.sin(startAngle);
-    const endX = cx + r * Math.cos(endAngle);
-    const endY = cy + r * Math.sin(endAngle);
-    const largeArc = (endAngle - startAngle) > Math.PI ? 1 : 0;
-    const d = `M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`;
-    doc.path(d).lineWidth(lineW).strokeColor(color).stroke();
-}
-function drawSeverityBar(doc, severityCount, findingsCount, regFont) {
-    if (findingsCount === 0)
+    catch (err) {
+        console.error('[skillsPdfReport] 字体注册失败:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'PDF 字体注册失败，请联系管理员' });
+        }
         return;
-    const barW = CONTENT_WIDTH;
-    const barH = 10;
-    const startX = MARGIN_LEFT;
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary).text('严重度分布', startX, doc.y);
-    doc.moveDown(0.3);
-    const barY = doc.y;
-    doc.roundedRect(startX, barY, barW, barH, 3).fill(COLORS.border);
-    let offsetX = 0;
-    for (const sev of SEVERITY_ORDER) {
-        const count = severityCount[sev] || 0;
-        if (count === 0)
-            continue;
-        const segW = (count / findingsCount) * barW;
-        if (segW > 0)
-            doc.roundedRect(startX + offsetX, barY, Math.max(segW, 2), barH, 3).fill(COLORS[sev]);
-        offsetX += segW;
     }
-    doc.y = barY + barH + 6;
-    const legendParts = [];
-    for (const sev of SEVERITY_ORDER) {
-        const count = severityCount[sev] || 0;
-        if (count > 0)
-            legendParts.push(`${SEVERITY_LABELS[sev]}: ${count}`);
+    const { reg, bold, mono, aero, song, fang, tnr } = fonts;
+    const filename = buildReportFilename(data.name, data.createdAt, 'pdf', 'skills-audit');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', contentDisposition(filename));
+    doc.pipe(res);
+    try {
+        // 封面页
+        doc.addPage();
+        drawCoverPage(doc, data, reg, aero, song, fang, tnr);
+        // Agent分类统计页
+        const agentStats = groupByAgent(data.findings);
+        if (Object.keys(agentStats).length > 0) {
+            doc.addPage();
+            drawAgentStatsPage(doc, data, reg, bold, aero, song, fang);
+        }
+        // 风险类别统计页
+        if (Object.keys(data.riskCategoryCount).length > 0) {
+            doc.addPage();
+            drawCategoryPage(doc, data, reg, bold, aero, fang);
+        }
+        // 发现项详情页
+        drawFindingPages(doc, data, reg, mono, aero, song, fang);
+        // 后处理
+        const reportId = `SKA-${Date.now()}`;
+        postProcessPages(doc, reportId, 'Skills安全审计');
+        doc.end();
     }
-    doc.font(regFont).fontSize(9).fillColor(COLORS.textSecondary)
-        .text(legendParts.join('   |   '), startX, doc.y, { width: barW, align: 'center' });
+    catch (err) {
+        console.error('[skillsPdfReport] PDF 生成出错:', err);
+        try {
+            doc.end();
+        }
+        catch { /* ignore */ }
+        try {
+            res.end();
+        }
+        catch { /* ignore */ }
+    }
 }
-/** 绘制风险类别统计页 */
-function drawCategoryPage(doc, data, regFont, boldFont) {
-    doc.font(boldFont).fontSize(18).fillColor(COLORS.purple).text('风险类别分布', MARGIN_LEFT);
-    doc.moveDown(0.5);
+/** 绘制封面页 */
+function drawCoverPage(doc, data, reg, aero, song, fang, tnr) {
+    // 封面主标题：二号 航天腾飞体 居中
+    drawCoverTitle(doc, 'Skills 安全审计报告', `${data.name}-${new Date().toLocaleString('zh-CN')}`);
+    // 评分板
+    const riskLevelZh = SEVERITY_ZH[(data.riskLevel || 'info').toUpperCase()] || data.riskLevel || '-';
+    doc.y = 300;
+    doc.moveDown(1);
+    drawScoreBoard(doc, {
+        score: data.riskScore,
+        scoreLabel: '风险评分',
+        stats: [
+            { label: '发现项总数', value: String(data.findingsCount), color: LIGHT_COLORS.text },
+            { label: 'Skills数量', value: String(data.totalSkills), color: LIGHT_COLORS.purple },
+            { label: '风险等级', value: riskLevelZh, color: data.riskLevel === 'critical' ? LIGHT_COLORS.critical : data.riskLevel === 'high' ? LIGHT_COLORS.high : data.riskLevel === 'medium' ? LIGHT_COLORS.medium : LIGHT_COLORS.green },
+            { label: '高危发现', value: String((data.severityCount.critical || 0) + (data.severityCount.high || 0)), color: LIGHT_COLORS.high },
+        ],
+        regFont: reg,
+        boldFont: reg,
+    });
+    // 严重度分布条
+    drawSeverityBar(doc, data.severityCount, data.findingsCount);
+    // 项目信息（表格：标签方正风雅宋，居中留白）
+    doc.moveDown(1.5);
+    drawTable(doc, [
+        { label: '项目名称', value: data.name || '-' },
+        { label: '原始文件', value: data.originalFilename || '-' },
+        { label: '文件数量', value: String(data.totalFiles || 0) },
+        { label: 'Skills数量', value: String(data.totalSkills || 0) },
+        { label: '发现项', value: String(data.findingsCount || 0) },
+        { label: '风险等级', value: riskLevelZh },
+    ], { regFont: reg, aeroFont: aero, fangFont: fang, tnrFont: tnr });
+    // 生成时间
+    doc.moveDown(1.5);
+    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.textSecondary)
+        .text(`报告生成时间: ${new Date().toLocaleString('zh-CN')}`, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH, align: 'center' })
+        .text('听风', PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH, align: 'center' });
+}
+/** 按Agent分组统计 */
+function groupByAgent(findings) {
+    const agentMap = {};
+    for (const f of findings) {
+        const agent = categoryToAgent(f.riskCategory);
+        if (!agentMap[agent])
+            agentMap[agent] = { count: 0, categories: new Set() };
+        agentMap[agent].count++;
+        agentMap[agent].categories.add(f.riskCategory);
+    }
+    return agentMap;
+}
+/** 风险类别 → Agent 映射 */
+function categoryToAgent(cat) {
+    const mapping = {
+        dangerous_command: '命令执行安全Agent', reverse_shell: '命令执行安全Agent',
+        hardcoded_secrets: '数据泄露安全Agent', data_exfiltration: '数据泄露安全Agent', sensitive_file_access: '数据泄露安全Agent',
+        prompt_injection: '提示注入安全Agent', trigger_hijacking: '提示注入安全Agent', skill_md_mismatch: '提示注入安全Agent',
+        dynamic_code_execution: '代码执行安全Agent', command_injection: '代码执行安全Agent', bytecode_tampering: '代码执行安全Agent',
+        privilege_escalation: '权限提升安全Agent', unauthorized_tool_use: '权限提升安全Agent',
+        weak_crypto: '供应链与加密安全Agent', supply_chain_attack: '供应链与加密安全Agent', obfuscation: '供应链与加密安全Agent',
+        resource_abuse: '资源滥用Agent', unicode_steganography: '资源滥用Agent',
+        social_engineering: '社会工程学Agent',
+        code_quality: '代码质量Agent',
+    };
+    return mapping[cat] || '其他Agent';
+}
+/**
+ * 绘制Agent分类统计页
+ * 一级标题：Agent 分类统计 — 三号居中
+ * Agent名称用小三，覆盖用五号
+ */
+function drawAgentStatsPage(doc, data, reg, bold, aero, song, fang) {
+    drawH1(doc, 'Agent 分类统计', aero);
+    const agentStats = groupByAgent(data.findings);
+    const entries = Object.entries(agentStats).sort(([, a], [, b]) => b.count - a.count);
+    const maxCnt = Math.max(...entries.map(([, v]) => v.count), 1);
+    for (const [agentName, stat] of entries) {
+        ensureSpace(doc, 40);
+        // Agent名称用小三 方正风雅宋
+        doc.font(fang).fontSize(FONT_SIZES.h2).fillColor(LIGHT_COLORS.textHeading)
+            .text(agentName, PAGE.MARGIN_LEFT, doc.y);
+        doc.moveDown(0.2);
+        const barW = (stat.count / maxCnt) * (PAGE.CONTENT_WIDTH - 160);
+        const barY = doc.y;
+        doc.roundedRect(PAGE.MARGIN_LEFT + 8, barY, barW, 14, 3).fill(LIGHT_COLORS.purple);
+        doc.font(reg).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.textSecondary)
+            .text(`${stat.count} 项`, PAGE.MARGIN_LEFT + 16 + barW, barY + 1);
+        // 覆盖：五号字体
+        const catLabels = Array.from(stat.categories).map(c => RISK_CATEGORY_LABELS[c] || c);
+        doc.font(song).fontSize(FONT_SIZES.small).fillColor(LIGHT_COLORS.textSecondary)
+            .text(`覆盖: ${catLabels.join(', ')}`, PAGE.MARGIN_LEFT + 8, barY + 18, { width: PAGE.CONTENT_WIDTH - 16 });
+        doc.moveDown(0.8);
+    }
+}
+/**
+ * 绘制风险类别统计页
+ * 一级标题：风险类别分布 — 三号居中
+ */
+function drawCategoryPage(doc, data, reg, bold, aero, fang) {
+    drawH1(doc, '风险类别分布', aero);
     const categories = Object.entries(data.riskCategoryCount)
         .sort(([, a], [, b]) => b - a);
     const maxCnt = Math.max(...categories.map(([, v]) => v), 1);
     for (const [cat, cnt] of categories) {
         ensureSpace(doc, 36);
         const label = RISK_CATEGORY_LABELS[cat] || cat;
-        const barW = (cnt / maxCnt) * (CONTENT_WIDTH - 160);
-        doc.font(regFont).fontSize(11).fillColor(COLORS.text)
-            .text(label, MARGIN_LEFT, doc.y, { width: 130 });
+        const barW = (cnt / maxCnt) * (PAGE.CONTENT_WIDTH - 160);
+        doc.font(fang).fontSize(FONT_SIZES.h2).fillColor(LIGHT_COLORS.text)
+            .text(label, PAGE.MARGIN_LEFT, doc.y, { width: 130 });
         const barY = doc.y - 14;
-        doc.roundedRect(MARGIN_LEFT + 140, barY, barW, 16, 3).fill(COLORS.purple);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-            .text(String(cnt), MARGIN_LEFT + 150 + barW, barY + 2);
+        doc.roundedRect(PAGE.MARGIN_LEFT + 140, barY, barW, 16, 3).fill(LIGHT_COLORS.purple);
+        doc.font(reg).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.textSecondary)
+            .text(String(cnt), PAGE.MARGIN_LEFT + 150 + barW, barY + 2);
         doc.moveDown(0.4);
     }
 }
+/** 按严重度分组 */
 function groupBySeverity(items) {
     const grouped = {};
     for (const sev of SEVERITY_ORDER)
@@ -266,7 +206,13 @@ function groupBySeverity(items) {
     }
     return grouped;
 }
-function drawFindingPages(doc, data, regFont, boldFont, monoFont) {
+/**
+ * 绘制发现项详情页
+ * 一级标题：严重 (N) — 三号居中
+ * 二级标题：1. 风险名称 — 小三方正风雅宋，等级标签小三航天腾飞体
+ * 三级标题：证据/漏洞代码/修复建议 — 四号方正风雅宋
+ */
+function drawFindingPages(doc, data, reg, mono, aero, song, fang) {
     if (!data.findings || data.findings.length === 0)
         return;
     const grouped = groupBySeverity(data.findings);
@@ -276,93 +222,98 @@ function drawFindingPages(doc, data, regFont, boldFont, monoFont) {
         if (!items?.length)
             continue;
         doc.addPage();
-        fillPageBackground(doc);
-        doc.rect(MARGIN_LEFT, doc.y, 4, 20).fill(COLORS[sev]);
-        doc.font(boldFont).fontSize(18).fillColor(COLORS[sev])
-            .text(` ${SEVERITY_LABELS[sev]} (${items.length})`, MARGIN_LEFT + 8);
-        doc.moveDown(0.5);
+        // 一级标题：严重 (N) — 三号 居中
+        const sevLabel = SEVERITY_ZH[sev.toUpperCase()] || sev;
+        drawH1(doc, `${sevLabel} (${items.length})`, aero);
         for (const item of items) {
             idx++;
             ensureSpace(doc, 100);
-            drawFindingCard(doc, item, sev, idx, regFont, boldFont, monoFont);
+            drawFindingCard(doc, item, sev, idx, reg, mono, aero, song, fang);
         }
     }
 }
-function drawFindingCard(doc, item, severity, index, regFont, boldFont, monoFont) {
-    // 标题行
-    doc.rect(MARGIN_LEFT, doc.y, 4, 16).fill(COLORS[severity]);
+/**
+ * 绘制单个发现项卡片
+ * 行号：bodyLarge(13pt)字号，居右排列，在"漏洞代码"下一行显示
+ * 代码片段：五号字体
+ */
+function drawFindingCard(doc, item, severity, index, reg, mono, aero, song, fang) {
+    const indent = PAGE.MARGIN_LEFT + 8;
+    const contentW = PAGE.CONTENT_WIDTH - 16;
+    // 二级标题行：等级标签（小三 航天腾飞体） + 编号+标题（小三 方正风雅宋）
+    ensureSpace(doc, 30);
     const titleY = doc.y;
-    doc.font(boldFont).fontSize(14).fillColor(COLORS[severity])
-        .text(`${index}. ${SEVERITY_LABELS[severity] || severity}`, MARGIN_LEFT + 8, titleY, { continued: true });
-    doc.font(boldFont).fontSize(14).fillColor(COLORS.text)
-        .text(`  ${item.title || '未命名发现'}`, { width: CONTENT_WIDTH - 10 });
-    doc.moveDown(0.2);
+    const tag = drawSeverityTag(doc, severity, aero, indent, titleY);
+    doc.font(fang).fontSize(FONT_SIZES.h2).fillColor(LIGHT_COLORS.textHeading)
+        .text(`${index}. ${item.title || '未命名发现'}`, indent + tag.width + 10, titleY + 2, { width: contentW - tag.width - 10 });
+    doc.moveDown(0.3);
     // 元信息
     const meta = [];
     if (item.riskCategory)
         meta.push(`风险类别: ${RISK_CATEGORY_LABELS[item.riskCategory] || item.riskCategory}`);
     if (item.filePath)
-        meta.push(`文件: ${item.filePath}${item.lineStart ? ':' + item.lineStart : ''}`);
+        meta.push(`文件: ${item.filePath}`);
     if (item.cweId)
         meta.push(`CWE: ${item.cweId}`);
     if (item.confidence)
         meta.push(`置信度: ${item.confidence}`);
     if (meta.length > 0) {
         ensureSpace(doc, 20);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-            .text(meta.join('  |  '), MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(song).fontSize(FONT_SIZES.bodyLarge).fillColor(LIGHT_COLORS.textSecondary)
+            .text(meta.join('  |  '), indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
     // 描述
     if (item.description) {
-        const descH = doc.font(regFont).fontSize(11).heightOfString(item.description, { width: CONTENT_WIDTH - 10 });
+        const descH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: contentW });
         ensureSpace(doc, Math.min(descH + 10, 80));
-        doc.font(regFont).fontSize(11).fillColor(COLORS.descText)
-            .text(item.description, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.description, indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
-    // 证据
+    // 证据 — 三级标题（四号 方正风雅宋）
     if (item.evidence) {
         ensureSpace(doc, 40);
-        doc.font(boldFont).fontSize(11).fillColor(COLORS.purple).text('证据', MARGIN_LEFT + 8);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.descText)
-            .text(item.evidence, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple).text('证据:', indent);
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.evidence, indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
-    // 漏洞代码
+    // 漏洞代码 — 三级标题，行号在标题同行居右
     if (item.vulnerableCode) {
-        const codeText = item.vulnerableCode.length > 2000 ? item.vulnerableCode.slice(0, 2000) + '\n...(已截断)' : item.vulnerableCode;
-        const boxWidth = PAGE_WIDTH - MARGIN_LEFT - 8 - MARGIN_RIGHT;
-        const textOptions = { width: boxWidth - 20, lineGap: 3 };
-        const textHeight = doc.font(monoFont).fontSize(9).heightOfString(codeText, textOptions);
-        const boxHeight = textHeight + 20;
-        const totalHeight = 16 + boxHeight;
-        if (doc.y + totalHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
-            doc.addPage();
-            fillPageBackground(doc);
+        ensureSpace(doc, 40);
+        const codeLabelY = doc.y;
+        doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.high).text('漏洞代码:', indent, codeLabelY);
+        // 行号在"漏洞代码"标题同行居右
+        if (item.lineStart) {
+            const lineLabel = `Line ${item.lineStart}${item.lineEnd && item.lineEnd !== item.lineStart ? `-${item.lineEnd}` : ''}`;
+            const lineLabelW = lineLabel.length * 7 + 16;
+            drawLineTag(doc, lineLabel, mono, indent + contentW - lineLabelW, codeLabelY + 2);
         }
-        doc.font(boldFont).fontSize(11).fillColor(COLORS.high).text('漏洞代码', MARGIN_LEFT + 8);
-        doc.moveDown(0.2);
-        const boxY = doc.y;
-        doc.rect(MARGIN_LEFT + 8, boxY, boxWidth, boxHeight).fill(COLORS.codeBlock);
-        doc.rect(MARGIN_LEFT + 8, boxY, boxWidth, boxHeight).strokeColor(COLORS.border).lineWidth(0.5).stroke();
-        doc.font(monoFont).fontSize(9).fillColor(COLORS.codeText)
-            .text(codeText, MARGIN_LEFT + 18, boxY + 10, textOptions);
-        doc.y = boxY + boxHeight + 8;
+        doc.moveDown(1);
+        drawCodeBlock(doc, {
+            label: '',
+            code: item.vulnerableCode || '',
+            labelColor: LIGHT_COLORS.high,
+            x: PAGE.MARGIN_LEFT,
+            regFont: reg,
+            boldFont: reg,
+            monoFont: mono,
+        });
     }
-    // 修复建议
+    // 修复建议 — 三级标题
     if (item.remediation) {
-        const fixH = doc.font(regFont).fontSize(10).heightOfString(item.remediation, { width: CONTENT_WIDTH - 10 });
+        const fixH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.remediation, { width: contentW });
         ensureSpace(doc, Math.min(fixH + 20, 60));
-        doc.font(boldFont).fontSize(11).fillColor(COLORS.green).text('修复建议', MARGIN_LEFT + 8);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.descText)
-            .text(item.remediation, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green).text('修复建议:', indent);
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.remediation, indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
     // 分隔线
     doc.moveDown(0.5);
     ensureSpace(doc, 20);
-    doc.moveTo(MARGIN_LEFT, doc.y).lineTo(PAGE_WIDTH - MARGIN_RIGHT, doc.y)
-        .strokeColor(COLORS.border).lineWidth(0.5).stroke();
+    doc.moveTo(PAGE.MARGIN_LEFT, doc.y).lineTo(PAGE.WIDTH - PAGE.MARGIN_RIGHT, doc.y)
+        .strokeColor(LIGHT_COLORS.cardBorder).lineWidth(0.5).stroke();
     doc.moveDown(0.5);
 }

@@ -21,6 +21,18 @@ export const contentDisposition = (filename: string) => {
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`
 }
 
+/** 生成统一的报告文件名：{safeName}-{YYYY-MM-DD-HH-mm-ss}.{ext} */
+export function buildReportFilename(name: string | undefined, createdAt: number | undefined, ext: string, fallbackName = 'report'): string {
+  const safeName = (name || fallbackName).replace(/[<>:"/\\|?*\s]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80)
+  let timeSuffix = ''
+  if (createdAt) {
+    const d = new Date(createdAt)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    timeSuffix = `-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
+  }
+  return `${safeName}${timeSuffix}.${ext}`
+}
+
 export const LIGHT_COLORS: Record<string, string> = {
   background:    '#ffffff',
   card:          '#f8fafc',
@@ -159,7 +171,11 @@ export function registerFonts(doc: PDFDoc): {
 }
 
 // ========== 页眉（5号宋体） ==========
-export function drawHeader(doc: PDFDoc, title: string, reportId: string, _regFont: string): void {
+export function drawHeader(doc: PDFDoc, title: string, reportId: string): void {
+  // 临时将底部边距设为0，防止 .text() 在页面顶部写入时被 LineWrapper 误判为超出内容区域而自动换页
+  const savedBottomMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+  
   doc.save();
   // 顶部细线
   doc.moveTo(PAGE.MARGIN_LEFT, 35)
@@ -173,11 +189,19 @@ export function drawHeader(doc: PDFDoc, title: string, reportId: string, _regFon
   doc.font('SongTi').fontSize(FONT_SIZES.header).fillColor(LIGHT_COLORS.textSecondary)
      .text(`Report ID: ${reportId}`, PAGE.MARGIN_LEFT, 22, { width: PAGE.CONTENT_WIDTH, align: 'right', lineBreak: false });
   doc.restore();
+  
+  // 恢复底部边距
+  doc.page.margins.bottom = savedBottomMargin;
 }
 
 // ========== 页脚 ==========
-export function drawFooter(doc: PDFDoc, pageNum: number, totalPages: number, _regFont: string): void {
+export function drawFooter(doc: PDFDoc, pageNum: number, totalPages: number): void {
   const y = PAGE.HEIGHT - 30;
+  
+  // 临时将底部边距设为0，防止 .text() 在 y=811.89 写入时超出 maxY(791.89) 触发 LineWrapper 自动换页
+  const savedBottomMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+  
   doc.save();
   // 底部细线
   doc.moveTo(PAGE.MARGIN_LEFT, y - 8)
@@ -189,8 +213,13 @@ export function drawFooter(doc: PDFDoc, pageNum: number, totalPages: number, _re
   doc.font('SongTi').fontSize(FONT_SIZES.header).fillColor(LIGHT_COLORS.textSecondary)
      .text(`Page ${pageNum} / ${totalPages}`, PAGE.MARGIN_LEFT, y, { width: PAGE.CONTENT_WIDTH, align: 'center', lineBreak: false });
   doc.font('SongTi').fontSize(FONT_SIZES.header).fillColor(LIGHT_COLORS.textSecondary)
-     .text('WindHear Security Audit Report', PAGE.MARGIN_LEFT, y, { width: PAGE.CONTENT_WIDTH, align: 'left', lineBreak: false });
+     .text('听风', PAGE.MARGIN_LEFT, y, { width: PAGE.CONTENT_WIDTH, align: 'left', lineBreak: false });
+  doc.font('SongTi').fontSize(FONT_SIZES.header).fillColor(LIGHT_COLORS.textSecondary)
+     .text('0x八月', PAGE.MARGIN_LEFT, y, { width: PAGE.CONTENT_WIDTH, align: 'right', lineBreak: false });
   doc.restore();
+  
+  // 恢复底部边距
+  doc.page.margins.bottom = savedBottomMargin;
 }
 
 // ========== 封面标题区（二号 航天腾飞体，居中） ==========
@@ -525,7 +554,7 @@ export function drawTable(doc: PDFDoc, rows: Array<{ label: string; value: strin
 }
 
 // ========== 严重度分布条 ==========
-export function drawSeverityBar(doc: PDFDoc, severityCount: Record<string, number>, findingsCount: number, _regFont: string): void {
+export function drawSeverityBar(doc: PDFDoc, severityCount: Record<string, number>, findingsCount: number): void {
   if (findingsCount === 0) return;
 
   const barW = PAGE.CONTENT_WIDTH;
@@ -564,11 +593,11 @@ export function drawSeverityBar(doc: PDFDoc, severityCount: Record<string, numbe
 }
 
 // ========== 后处理：添加页眉页脚 ==========
-export function postProcessPages(doc: PDFDoc, reportId: string, moduleName: string, _regFont: string): void {
+export function postProcessPages(doc: PDFDoc, reportId: string, moduleName: string): void {
   const range = doc.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++) {
     doc.switchToPage(i);
-    drawHeader(doc, moduleName, reportId, _regFont);
-    drawFooter(doc, i + 1, range.count, _regFont);
+    drawHeader(doc, moduleName, reportId);
+    drawFooter(doc, i + 1, range.count);
   }
 }

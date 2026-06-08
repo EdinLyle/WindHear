@@ -398,7 +398,6 @@ function buildReportHtml(report: Report) {
   const total = e.totalCount ?? 0
   const pass = e.passCount ?? 0
   const fail = e.failCount ?? 0
-  const year = new Date().getFullYear()
 
   const TRUNCATE_LEN = 200
 
@@ -493,7 +492,7 @@ function buildReportHtml(report: Report) {
 
     <div class="footer">
       <div>听风</div>
-      <div>© ${year} 听风</div>
+      <div>0x八月</div>
     </div>
   </div>
 </body>

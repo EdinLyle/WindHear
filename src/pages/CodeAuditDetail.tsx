@@ -480,7 +480,7 @@ export function CodeAuditDetailPage() {
                   <a href={`/api/code-audit/${audit.id}/report?format=pdf`} target="_blank" rel="noopener" className="btn outline sm">导出 PDF</a>
                   <a href={`/api/code-audit/${audit.id}/report?format=html`} target="_blank" rel="noopener" className="btn outline sm">导出 HTML</a>
                   <a href={`/api/code-audit/${audit.id}/report?format=md`} target="_blank" rel="noopener" className="btn outline sm">导出 MD</a>
-                  <a href={`/api/code-audit/${audit.id}/report?format=json`} target="_blank" rel="noopener" className="btn outline sm">导出 JSON</a>
+                  
                 </div>
               </>
             )}

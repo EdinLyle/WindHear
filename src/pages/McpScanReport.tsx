@@ -404,7 +404,6 @@ function escapeHtml(s: string) {
 function buildMcpReportHtml(report: McpScanReportData, status: McpScanListItem, title: string) {
   const createdAt = formatTime(status.createdAt)
   const completedAt = report.generatedAt ? formatTime(report.generatedAt) : ''
-  const year = new Date().getFullYear()
 
   const getStatusClass = (status: string) => {
     if (status === 'confirmed') return 'bad'
@@ -507,7 +506,7 @@ function buildMcpReportHtml(report: McpScanReportData, status: McpScanListItem, 
 
     <div class="footer">
       <div>听风</div>
-      <div>&copy; ${year} 听风</div>
+      <div>0x八月</div>
     </div>
   </div>
 </body>

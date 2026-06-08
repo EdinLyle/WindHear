@@ -5,8 +5,8 @@ export class CodeAuditStore {
     }
     // ===== 审计任务 CRUD =====
     async createAudit(input) {
-        const result = await this.db.run(`INSERT INTO code_audits (name, source_type, source_path, source_url, status, language, model_config, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)`, input.name, input.sourceType, input.sourcePath, input.sourceUrl ?? null, input.language ?? null, input.modelConfig ? JSON.stringify(input.modelConfig) : null, Date.now(), Date.now());
+        const result = await this.db.run(`INSERT INTO code_audits (name, source_type, source_path, source_url, status, language, model_config, original_filename, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`, input.name, input.sourceType, input.sourcePath, input.sourceUrl ?? null, input.language ?? null, input.modelConfig ? JSON.stringify(input.modelConfig) : null, input.originalFilename ?? null, Date.now(), Date.now());
         return result.lastID;
     }
     async getAudit(id) {
@@ -87,8 +87,8 @@ export class CodeAuditStore {
     }
     // ===== 审计发现项 =====
     async createItem(input) {
-        const result = await this.db.run(`INSERT INTO code_audit_items (audit_id, slice_id, cwe_id, cwe_name, title, description, file_path, line_start, line_end, vulnerable_code, fix_suggestion, severity, confidence, exploitability, data_flow, poc_description, poc_code, reproduce_steps, fix_code, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.auditId, input.sliceId ?? null, input.cweId ?? null, input.cweName ?? null, input.title, input.description ?? null, input.filePath, input.lineStart ?? null, input.lineEnd ?? null, input.vulnerableCode ?? null, input.fixSuggestion ?? null, input.severity, input.confidence, input.exploitability ?? 5, input.dataFlow ?? null, input.pocDescription ?? null, input.pocCode ?? null, input.reproduceSteps ?? null, input.fixCode ?? null, input.status ?? 'pending');
+        const result = await this.db.run(`INSERT INTO code_audit_items (audit_id, slice_id, cwe_id, cwe_name, title, description, file_path, line_start, line_end, vulnerable_code, fix_suggestion, severity, confidence, exploitability, data_flow, poc_description, poc_code, reproduce_steps, fix_code, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, input.auditId, input.sliceId ?? null, input.cweId ?? null, input.cweName ?? null, input.title, input.description ?? null, input.filePath, input.lineStart ?? null, input.lineEnd ?? null, input.vulnerableCode ?? null, input.fixSuggestion ?? null, input.severity, input.confidence, input.exploitability ?? 5, input.dataFlow ?? null, input.pocDescription ?? null, input.pocCode ?? null, input.reproduceSteps ?? null, input.fixCode ?? null, input.status ?? 'pending');
         return result.lastID;
     }
     async getItemsByAudit(auditId, options) {

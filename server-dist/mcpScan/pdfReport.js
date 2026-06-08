@@ -1,245 +1,130 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// 颜色常量（暗色主题）
-const COLORS = {
-    background: '#0f172a',
-    card: '#1e293b',
-    text: '#f1f5f9',
-    textSecondary: '#94a3b8',
-    critical: '#ef4444',
-    high: '#f97316',
-    medium: '#eab308',
-    low: '#3b82f6',
-    info: '#6b7280',
-    codeBlock: '#0f172a',
-    border: '#334155',
-    green: '#22c55e',
-    purple: '#a78bfa',
-    codeText: '#e2e8f0',
-    descText: '#cbd5e1',
-};
-const SEVERITY_LABELS = {
-    critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息'
-};
+import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawTable, drawSeverityBar, ensureSpace, postProcessPages, SEVERITY_ZH, STATUS_ZH, FONT_SIZES, } from '../pdfCommon.js';
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
-const FONT_REGULAR = 'CN';
-const FONT_BOLD = 'CN-Bold';
-const FONT_MONO = 'Mono';
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
-const MARGIN_TOP = 60;
-const MARGIN_BOTTOM = 60;
-const MARGIN_LEFT = 50;
-const MARGIN_RIGHT = 50;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 /**
  * 生成MCP评估PDF报告并流式输出到HTTP响应
  */
 export function generateMcpPdfReport(data, res) {
     const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: MARGIN_TOP, bottom: MARGIN_BOTTOM, left: MARGIN_LEFT, right: MARGIN_RIGHT },
+        margins: { top: PAGE.MARGIN_TOP, bottom: PAGE.MARGIN_BOTTOM, left: PAGE.MARGIN_LEFT, right: PAGE.MARGIN_RIGHT },
         bufferPages: true,
         autoFirstPage: false,
         info: {
             Title: `MCP安全评估报告 - ${data.name}`,
             Author: '听风',
             Subject: 'MCP安全评估报告',
-        }
+        },
     });
-    // 注册中文字体
-    const fontsDir = path.join(__dirname, '../fonts');
-    const fontRegular = path.join(fontsDir, 'NotoSansSC-Regular.ttf');
-    const fontBold = path.join(fontsDir, 'NotoSansSC-Bold.ttf');
-    const fontMono = path.join(fontsDir, 'NotoSansMono-Regular.ttf');
-    const hasRegular = fs.existsSync(fontRegular);
-    const hasBold = fs.existsSync(fontBold);
-    const hasMono = fs.existsSync(fontMono);
-    if (hasRegular)
-        doc.registerFont(FONT_REGULAR, fontRegular);
-    if (hasBold)
-        doc.registerFont(FONT_BOLD, fontBold);
-    if (hasMono)
-        doc.registerFont(FONT_MONO, fontMono);
-    const regFont = hasRegular ? FONT_REGULAR : 'Helvetica';
-    const boldFont = hasBold ? FONT_BOLD : (hasRegular ? FONT_REGULAR : 'Helvetica-Bold');
-    const monoFont = hasMono ? FONT_MONO : 'Courier';
-    // 设置响应头
-    const filename = `mcp-report-${data.name}-${Date.now()}.pdf`;
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    doc.pipe(res);
-    doc.on('pageAdded', () => { fillPageBackground(doc); });
-    // 封面页
-    doc.addPage();
-    drawCoverPage(doc, data, regFont, boldFont);
-    // 漏洞详情页
-    drawVulnerabilityPages(doc, data, regFont, boldFont, monoFont);
-    // 页眉页脚
-    postProcessPages(doc, data, regFont);
-    doc.end();
-}
-function postProcessPages(doc, data, regFont) {
-    const pages = doc.bufferedPageRange();
-    const totalPages = pages.count;
-    for (let i = 0; i < totalPages; i++) {
-        doc.switchToPage(i);
-        const savedY = doc.y;
-        doc.font(regFont).fontSize(8).fillColor(COLORS.textSecondary);
-        doc.text(`听风 | ${data.name}`, MARGIN_LEFT, 25, { lineBreak: false, width: CONTENT_WIDTH, height: 12 });
-        doc.font(regFont).fontSize(8).fillColor(COLORS.textSecondary);
-        doc.text(`${i + 1} / ${totalPages}`, MARGIN_LEFT, PAGE_HEIGHT - 35, { lineBreak: false, width: CONTENT_WIDTH, align: 'center', height: 12 });
-        doc.y = savedY;
+    let fonts;
+    try {
+        fonts = registerFonts(doc);
     }
-}
-function ensureSpace(doc, neededHeight) {
-    if (doc.y + neededHeight > PAGE_HEIGHT - MARGIN_BOTTOM) {
-        doc.addPage();
-        fillPageBackground(doc);
-    }
-}
-function fillPageBackground(doc) {
-    doc.save();
-    doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT).fill(COLORS.background);
-    doc.restore();
-}
-function drawCoverPage(doc, data, regFont, boldFont) {
-    fillPageBackground(doc);
-    doc.font(boldFont).fontSize(28).fillColor(COLORS.text)
-        .text('MCP 安全评估报告', { align: 'center' });
-    doc.moveDown(0.5);
-    doc.font(regFont).fontSize(14).fillColor(COLORS.textSecondary)
-        .text(data.name, { align: 'center' });
-    doc.moveDown(2);
-    // 评分环
-    const ringSize = 120;
-    const ringX = (PAGE_WIDTH - ringSize) / 2;
-    drawScoreRing(doc, ringX, doc.y, ringSize, data.scoreTotal, boldFont, regFont);
-    doc.y += ringSize + 20;
-    // 统计卡片
-    const sevCount = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    for (const f of data.findings) {
-        const s = f.severity || 'info';
-        if (sevCount[s] !== undefined)
-            sevCount[s]++;
-    }
-    const cardW = (CONTENT_WIDTH - 30) / 4;
-    const cardH = 60;
-    const startX = MARGIN_LEFT;
-    const startY = doc.y;
-    const cards = [
-        { label: '发现总数', value: String(data.findings.length), color: COLORS.text },
-        { label: '严重漏洞', value: String(sevCount.critical), color: COLORS.critical },
-        { label: '高危漏洞', value: String(sevCount.high), color: COLORS.high },
-        { label: '中危漏洞', value: String(sevCount.medium), color: COLORS.medium },
-    ];
-    for (let i = 0; i < cards.length; i++) {
-        const card = cards[i];
-        const cx = startX + i * (cardW + 10);
-        doc.roundedRect(cx, startY, cardW, cardH, 6).fill(COLORS.card);
-        doc.font(boldFont).fontSize(24).fillColor(card.color)
-            .text(card.value, cx, startY + 8, { width: cardW, align: 'center' });
-        doc.font(regFont).fontSize(9).fillColor(COLORS.textSecondary)
-            .text(card.label, cx, startY + 38, { width: cardW, align: 'center' });
-    }
-    doc.y = startY + cardH + 16;
-    // 严重度分布条
-    drawSeverityBar(doc, sevCount, data.findings.length, regFont);
-    // 项目信息
-    doc.moveDown(1.5);
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary);
-    const info = data.projectInfo;
-    const infoLines = [
-        `项目名称: ${data.name}`,
-        `编程语言: ${info.languages?.join(', ') || 'Unknown'}`,
-        `框架: ${info.frameworks?.join(', ') || '-'}`,
-        `文件数: ${info.fileStats?.totalFiles ?? '-'}`,
-        `风险等级: ${data.scoreRiskLevel}`,
-    ];
-    for (const line of infoLines) {
-        doc.text(line, { align: 'center' });
-    }
-    doc.moveDown(1.5);
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-        .text(`报告生成时间: ${new Date().toLocaleString('zh-CN')}`, { align: 'center' })
-        .text('听风', { align: 'center' });
-}
-function drawScoreRing(doc, x, y, size, score, boldFont, regFont) {
-    const cx = x + size / 2;
-    const cy = y + size / 2;
-    const radius = size / 2 - 10;
-    const lineW = 8;
-    doc.circle(cx, cy, radius).lineWidth(lineW).strokeColor(COLORS.border).stroke();
-    const scoreVal = Math.min(Math.max(score, 0), 100);
-    const scoreColor = scoreVal >= 70 ? COLORS.critical : scoreVal >= 40 ? COLORS.high : scoreVal >= 20 ? COLORS.medium : COLORS.green;
-    if (scoreVal > 0) {
-        const startAngle = -Math.PI / 2;
-        const endAngle = startAngle + (2 * Math.PI * scoreVal / 100);
-        drawArc(doc, cx, cy, radius, startAngle, endAngle, lineW, scoreColor);
-    }
-    doc.font(boldFont).fontSize(30).fillColor(scoreColor)
-        .text(String(scoreVal), x, cy - 15, { width: size, align: 'center' });
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-        .text('风险评分', x, cy + 18, { width: size, align: 'center' });
-}
-function drawArc(doc, cx, cy, r, startAngle, endAngle, lineW, color) {
-    const startX = cx + r * Math.cos(startAngle);
-    const startY = cy + r * Math.sin(startAngle);
-    const endX = cx + r * Math.cos(endAngle);
-    const endY = cy + r * Math.sin(endAngle);
-    const largeArc = (endAngle - startAngle) > Math.PI ? 1 : 0;
-    const d = `M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY}`;
-    doc.path(d).lineWidth(lineW).strokeColor(color).stroke();
-}
-function drawSeverityBar(doc, severityCount, findingsCount, regFont) {
-    if (findingsCount === 0)
+    catch (err) {
+        console.error('[mcpPdfReport] 字体注册失败:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'PDF 字体注册失败，请联系管理员' });
+        }
         return;
-    const barW = CONTENT_WIDTH;
-    const barH = 10;
-    const startX = MARGIN_LEFT;
-    doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary).text('严重度分布', startX, doc.y);
-    doc.moveDown(0.3);
-    const barY = doc.y;
-    doc.roundedRect(startX, barY, barW, barH, 3).fill(COLORS.border);
-    let offsetX = 0;
-    for (const sev of SEVERITY_ORDER) {
-        const count = severityCount[sev] || 0;
-        if (count === 0)
-            continue;
-        const segW = (count / findingsCount) * barW;
-        if (segW > 0)
-            doc.roundedRect(startX + offsetX, barY, Math.max(segW, 2), barH, 3).fill(COLORS[sev]);
-        offsetX += segW;
     }
-    doc.y = barY + barH + 6;
-    const legendParts = [];
-    for (const sev of SEVERITY_ORDER) {
-        const count = severityCount[sev] || 0;
-        if (count > 0)
-            legendParts.push(`${SEVERITY_LABELS[sev]}: ${count}`);
+    const { reg, mono, aero, song, fang, tnr } = fonts;
+    const filename = buildReportFilename(data.name, data.createdAt, 'pdf', 'mcp-scan');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', contentDisposition(filename));
+    doc.pipe(res);
+    try {
+        // 封面页
+        doc.addPage();
+        drawCoverPage(doc, data, reg, aero, song, fang, tnr);
+        // 漏洞详情页
+        drawVulnerabilityPages(doc, data, reg, mono, aero, song, fang);
+        // 后处理
+        const reportId = `MCP-${Date.now()}`;
+        postProcessPages(doc, reportId, 'MCP安全评估');
+        doc.end();
     }
-    doc.font(regFont).fontSize(9).fillColor(COLORS.textSecondary)
-        .text(legendParts.join('   |   '), startX, doc.y, { width: barW, align: 'center' });
+    catch (err) {
+        console.error('[mcpPdfReport] PDF 生成出错:', err);
+        try {
+            doc.end();
+        }
+        catch { /* ignore */ }
+        try {
+            res.end();
+        }
+        catch { /* ignore */ }
+    }
 }
+/** 绘制封面页 */
+function drawCoverPage(doc, data, reg, aero, song, fang, tnr) {
+    // 封面主标题：二号 航天腾飞体 居中
+    drawCoverTitle(doc, 'MCP 安全评估报告', `${data.name}-${new Date().toLocaleString('zh-CN')}`);
+    // 评分板
+    const sevCount = countSeverities(data.findings);
+    doc.y = 300;
+    doc.moveDown(1);
+    drawScoreBoard(doc, {
+        score: data.scoreTotal ?? 0,
+        scoreLabel: '风险评分',
+        stats: [
+            { label: '发现总数', value: String(data.findings.length), color: LIGHT_COLORS.text },
+            { label: '严重漏洞', value: String(sevCount.critical), color: LIGHT_COLORS.critical },
+            { label: '高危漏洞', value: String(sevCount.high), color: LIGHT_COLORS.high },
+            { label: '中危漏洞', value: String(sevCount.medium), color: LIGHT_COLORS.medium },
+        ],
+        regFont: reg,
+        boldFont: reg,
+    });
+    // 严重度分布条
+    drawSeverityBar(doc, sevCount, data.findings.length);
+    // 项目信息（表格：标签方正风雅宋，居中留白）
+    doc.moveDown(1.5);
+    const info = data.projectInfo;
+    const riskLevelZh = SEVERITY_ZH[(data.scoreRiskLevel || 'info').toUpperCase()] || data.scoreRiskLevel || '-';
+    drawTable(doc, [
+        { label: '项目名称', value: data.name || '-' },
+        { label: '原始文件', value: data.originalFilename || '-' },
+        { label: '项目路径', value: info.projectPath || info.rootName || '-' },
+        { label: '编程语言', value: (info.languages || []).join(', ') || '-' },
+        { label: '框架', value: (info.frameworks || []).join(', ') || '-' },
+        { label: 'MCP Servers', value: info.mcpServersCount !== undefined ? String(info.mcpServersCount) : '-' },
+        { label: 'MCP指标', value: (info.mcpIndicators || []).join(', ') || '-' },
+        { label: '文件数', value: info.fileStats ? String(info.fileStats.totalFiles) : '-' },
+        { label: '风险等级', value: riskLevelZh },
+    ], { regFont: reg, aeroFont: aero, fangFont: fang, tnrFont: tnr });
+    doc.moveDown(0.8);
+    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.textSecondary)
+        .text(`报告生成时间: ${new Date().toLocaleString('zh-CN')}`, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH, align: 'center' });
+}
+/** 统计各严重度数量 */
+function countSeverities(findings) {
+    const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    for (const f of findings) {
+        const s = f.severity || 'info';
+        if (counts[s] !== undefined)
+            counts[s]++;
+    }
+    return counts;
+}
+/** 按严重度分组 */
 function groupBySeverity(items) {
-    const grouped = {};
-    for (const sev of SEVERITY_ORDER)
-        grouped[sev] = [];
+    const grouped = {
+        critical: [], high: [], medium: [], low: [], info: [],
+    };
     for (const item of items) {
         const sev = item.severity || 'info';
         if (grouped[sev])
             grouped[sev].push(item);
-        else
-            grouped[sev] = [item];
     }
     return grouped;
 }
-function drawVulnerabilityPages(doc, data, regFont, boldFont, monoFont) {
+/**
+ * 绘制漏洞详情页
+ * 一级标题：高危 (1) — 三号居中
+ * 二级标题：1.漏洞标题 — 小三方正风雅宋，等级标签小三航天腾飞体
+ * 三级标题：影响/利用方式/修复方式 — 四号方正风雅宋
+ */
+function drawVulnerabilityPages(doc, data, reg, mono, aero, song, fang) {
     if (!data.findings || data.findings.length === 0)
         return;
     const grouped = groupBySeverity(data.findings);
@@ -249,89 +134,113 @@ function drawVulnerabilityPages(doc, data, regFont, boldFont, monoFont) {
         if (!items?.length)
             continue;
         doc.addPage();
-        fillPageBackground(doc);
-        doc.rect(MARGIN_LEFT, doc.y, 4, 20).fill(COLORS[sev]);
-        doc.font(boldFont).fontSize(18).fillColor(COLORS[sev])
-            .text(` ${SEVERITY_LABELS[sev]} (${items.length})`, MARGIN_LEFT + 8);
-        doc.moveDown(0.5);
+        // 一级标题：高危 (1) — 三号 居中
+        const sevLabel = SEVERITY_ZH[sev.toUpperCase()] || sev;
+        drawH1(doc, `${sevLabel} (${items.length})`, aero);
         for (const item of items) {
             vulnIndex++;
             ensureSpace(doc, 100);
-            drawVulnCard(doc, item, sev, vulnIndex, regFont, boldFont, monoFont);
+            drawVulnCard(doc, item, sev, vulnIndex, reg, mono, aero, song, fang);
         }
     }
 }
-function drawVulnCard(doc, item, severity, index, regFont, boldFont, monoFont) {
-    // 标题行
-    doc.rect(MARGIN_LEFT, doc.y, 4, 16).fill(COLORS[severity]);
+/** 绘制单个漏洞卡片 */
+function drawVulnCard(doc, item, severity, index, reg, mono, aero, song, fang) {
+    const indent = PAGE.MARGIN_LEFT + 8;
+    const contentW = PAGE.CONTENT_WIDTH - 16;
+    // 二级标题行：等级标签（小三 航天腾飞体） + 编号+标题（小三 方正风雅宋）
+    ensureSpace(doc, 30);
     const titleY = doc.y;
-    doc.font(boldFont).fontSize(14).fillColor(COLORS[severity])
-        .text(`${index}. ${SEVERITY_LABELS[severity] || severity}`, MARGIN_LEFT + 8, titleY, { continued: true });
-    doc.font(boldFont).fontSize(14).fillColor(COLORS.text)
-        .text(`  ${item.title || '未命名漏洞'}`, { width: CONTENT_WIDTH - 10 });
-    doc.moveDown(0.2);
-    // 元信息
+    const tag = drawSeverityTag(doc, severity, aero, indent, titleY);
+    doc.font(fang).fontSize(FONT_SIZES.h2).fillColor(LIGHT_COLORS.textHeading)
+        .text(`${index}. ${item.title || '未命名漏洞'}`, indent + tag.width + 10, titleY + 2, { width: contentW - tag.width - 10 });
+    doc.moveDown(0.3);
+    // 元信息（状态英文→中文）
     const meta = [];
     if (item.category)
-        meta.push(`类别: ${item.category}`);
-    if (item.confidence)
-        meta.push(`置信度: ${item.confidence}`);
-    if (item.status)
-        meta.push(`状态: ${item.status}`);
+        meta.push(`类别: ${item.category || ''}`);
+    if (item.confidence) {
+        const confStr = String(item.confidence);
+        const confZh = STATUS_ZH[confStr.toLowerCase()] || confStr;
+        meta.push(`置信度: ${confZh}`);
+    }
+    if (item.status) {
+        const statusStr = String(item.status);
+        const statusZh = STATUS_ZH[statusStr.toLowerCase()] || statusStr;
+        meta.push(`状态: ${statusZh}`);
+    }
     if (meta.length > 0) {
         ensureSpace(doc, 20);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-            .text(meta.join('  |  '), MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.textSecondary)
+            .text(meta.join('  |  '), indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
     // 描述
     if (item.description) {
-        const descH = doc.font(regFont).fontSize(11).heightOfString(item.description, { width: CONTENT_WIDTH - 10 });
+        const descH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: contentW });
         ensureSpace(doc, Math.min(descH + 10, 80));
-        doc.font(regFont).fontSize(11).fillColor(COLORS.descText)
-            .text(item.description, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.description, indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
-    // 影响
+    // 影响 — 三级标题（四号 方正风雅宋）
     if (item.impact) {
         ensureSpace(doc, 40);
-        doc.font(boldFont).fontSize(11).fillColor(COLORS.critical).text('影响', MARGIN_LEFT + 8);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.descText)
-            .text(item.impact, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.critical).text('影响:', indent);
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.impact, indent, doc.y, { width: contentW });
+        doc.moveDown(0.3);
+    }
+    // 利用方式 — 三级标题
+    if (item.exploitation) {
+        ensureSpace(doc, 40);
+        doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple).text('利用方式:', indent);
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.exploitation, indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
     // 证据
     if (item.evidence && Array.isArray(item.evidence) && item.evidence.length > 0) {
         for (const ev of item.evidence) {
             ensureSpace(doc, 30);
-            doc.font(regFont).fontSize(10).fillColor(COLORS.textSecondary)
-                .text(`文件: ${ev.file}${ev.lineStart ? ':' + ev.lineStart : ''}`, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+            // 文件：+ 行号 — bodyLarge字号(13pt)
+            const fileY = doc.y;
+            const lineLabel = ev.lineStart ? `L${ev.lineStart}${ev.lineEnd && ev.lineEnd !== ev.lineStart ? `-${ev.lineEnd}` : ''}` : '';
+            doc.font(song).fontSize(FONT_SIZES.bodyLarge).fillColor(LIGHT_COLORS.textSecondary)
+                .text(`文件: ${ev.file || ''}${lineLabel ? '  ' : ''}`, indent, fileY, { width: contentW - 80 });
+            if (lineLabel) {
+                // 行号标签居右
+                const lineLabelW = lineLabel.length * 7 + 16;
+                drawLineTag(doc, lineLabel, mono, indent + contentW - lineLabelW, fileY);
+            }
+            doc.y = fileY + 18;
             if (ev.snippet) {
-                const snippetText = ev.snippet.length > 500 ? ev.snippet.slice(0, 500) + '\n...(已截断)' : ev.snippet;
-                const codeH = doc.font(monoFont).fontSize(9).heightOfString(snippetText, { width: CONTENT_WIDTH - 30 });
-                ensureSpace(doc, Math.min(codeH + 30, 100));
-                const boxY = doc.y;
-                doc.rect(MARGIN_LEFT + 8, boxY, CONTENT_WIDTH - 16, codeH + 16).fill(COLORS.codeBlock);
-                doc.font(monoFont).fontSize(9).fillColor(COLORS.codeText)
-                    .text(snippetText, MARGIN_LEFT + 18, boxY + 8, { width: CONTENT_WIDTH - 36 });
-                doc.y = boxY + codeH + 24;
+                drawCodeBlock(doc, {
+                    label: '代码片段',
+                    code: ev.snippet || '',
+                    labelColor: LIGHT_COLORS.textSecondary,
+                    x: indent,
+                    regFont: reg,
+                    boldFont: reg,
+                    monoFont: mono,
+                });
             }
         }
         doc.moveDown(0.2);
     }
-    // 修复建议
+    // 修复方式 — 三级标题
     if (item.remediation) {
-        const fixH = doc.font(regFont).fontSize(10).heightOfString(item.remediation, { width: CONTENT_WIDTH - 10 });
+        const fixH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.remediation, { width: contentW });
         ensureSpace(doc, Math.min(fixH + 20, 60));
-        doc.font(boldFont).fontSize(11).fillColor(COLORS.green).text('修复建议', MARGIN_LEFT + 8);
-        doc.font(regFont).fontSize(10).fillColor(COLORS.descText)
-            .text(item.remediation, MARGIN_LEFT + 8, doc.y, { width: CONTENT_WIDTH - 10 });
+        doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green).text('修复方式:', indent);
+        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
+            .text(item.remediation, indent, doc.y, { width: contentW });
         doc.moveDown(0.3);
     }
     // 分隔线
     doc.moveDown(0.5);
     ensureSpace(doc, 20);
-    doc.moveTo(MARGIN_LEFT, doc.y).lineTo(PAGE_WIDTH - MARGIN_RIGHT, doc.y)
-        .strokeColor(COLORS.border).lineWidth(0.5).stroke();
+    doc.moveTo(PAGE.MARGIN_LEFT, doc.y).lineTo(PAGE.WIDTH - PAGE.MARGIN_RIGHT, doc.y)
+        .strokeColor(LIGHT_COLORS.cardBorder).lineWidth(0.5).stroke();
     doc.moveDown(0.5);
 }

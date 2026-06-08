@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit'
 import type { Response } from 'express'
 import {
-  LIGHT_COLORS, PAGE, registerFonts, contentDisposition,
+  LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
   drawH1, drawSeverityTag,
   drawTable,
@@ -23,6 +23,7 @@ interface EvaluationData {
   standard: string
   targetModel: string
   targetProvider: string
+  createdAt?: number
 }
 
 // 评估项接口
@@ -74,8 +75,7 @@ export function generateEvaluationPdfReport(evaluation: EvaluationData, items: E
   const { reg: regFont, aero: aeroFont, song: songFont, fang: fangFont, tnr: tnrFont } = fonts
 
   // 设置响应头
-  const rawName = (evaluation.name || 'eval-report').replace(/[<>:"/\\|?*\s]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-  const filename = `${rawName}.pdf`
+  const filename = buildReportFilename(evaluation.name, evaluation.createdAt, 'pdf', 'evaluation')
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', contentDisposition(filename))
 
@@ -91,7 +91,7 @@ export function generateEvaluationPdfReport(evaluation: EvaluationData, items: E
 
     // 后处理：页眉页脚
     const reportId = `EVAL-${Date.now().toString(36).toUpperCase()}`
-    postProcessPages(doc, reportId, evaluation.name, regFont)
+    postProcessPages(doc, reportId, evaluation.name)
 
     doc.end()
   } catch (err) {

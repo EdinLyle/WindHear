@@ -321,6 +321,7 @@ export function createCodeAudit(input: {
   apiKey?: string
   model?: string
   timeoutMs?: number
+  filename?: string
 }) {
   return apiFetch<{ id: number; name: string; status: string }>('/api/code-audit', {
     method: 'POST',
@@ -370,7 +371,7 @@ export function deleteCodeAudit(id: number) {
   return apiFetch<{ ok: true }>(`/api/code-audit/${id}`, { method: 'DELETE' })
 }
 
-export function getCodeAuditReport(id: number, format: 'json' | 'html' | 'pdf' = 'json') {
+export function getCodeAuditReport(id: number, format: 'html' | 'pdf' = 'pdf') {
   if (format === 'pdf') {
     window.open(`/api/code-audit/${id}/report?format=pdf`, '_blank')
     return
@@ -378,15 +379,6 @@ export function getCodeAuditReport(id: number, format: 'json' | 'html' | 'pdf' =
   if (format === 'html') {
     return apiFetch<string>(`/api/code-audit/${id}/report?format=html`)
   }
-  return apiFetch<{
-    audit: {
-      id: number; name: string; status: string; language: string | null
-      riskScore: number; totalFiles: number; totalSlices: number; findingsCount: number
-      severityCount: Record<string, number>; cweCount: Record<string, number>
-      createdAt: number; completedAt: number | null
-    }
-    items: CodeAuditItem[]
-  }>(`/api/code-audit/${id}/report`)
 }
 
 export function listVulnKb() {
@@ -428,6 +420,7 @@ export function createSkillsAudit(input: {
   apiKey?: string
   model?: string
   timeoutMs?: number
+  filename?: string
 }) {
   return apiFetch<{ id: number; name: string; status: string }>('/api/skills-audit', {
     method: 'POST',
@@ -468,7 +461,7 @@ export function updateSkillsAuditItemStatus(itemId: number, status: 'confirmed' 
   })
 }
 
-export function getSkillsAuditReport(id: number, format: 'json' | 'html' | 'md' | 'pdf' = 'json') {
+export function getSkillsAuditReport(id: number, format: 'html' | 'md' | 'pdf' = 'pdf') {
   if (format === 'pdf') {
     window.open(`/api/skills-audit/${id}/report?format=pdf`, '_blank')
     return
@@ -479,14 +472,6 @@ export function getSkillsAuditReport(id: number, format: 'json' | 'html' | 'md' 
   if (format === 'md') {
     return apiFetch<string>(`/api/skills-audit/${id}/report?format=md`)
   }
-  return apiFetch<{
-    auditId: number
-    generatedAt: number
-    projectInfo: { totalFiles: number; totalSkills: number; skills: string[]; manifest: string | null }
-    findings: SkillsAuditItem[]
-    scoreTotal: number
-    scoreRiskLevel: string
-  }>(`/api/skills-audit/${id}/report?format=${format}`)
 }
 
 export function deleteSkillsAudit(id: number) {

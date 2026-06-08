@@ -18,16 +18,18 @@ export class CodeAuditStore {
     sourceUrl?: string
     language?: string
     modelConfig?: Record<string, unknown>
+    originalFilename?: string
   }): Promise<number> {
     const result = await this.db.run(
-      `INSERT INTO code_audits (name, source_type, source_path, source_url, status, language, model_config, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+      `INSERT INTO code_audits (name, source_type, source_path, source_url, status, language, model_config, original_filename, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       input.name,
       input.sourceType,
       input.sourcePath,
       input.sourceUrl ?? null,
       input.language ?? null,
       input.modelConfig ? JSON.stringify(input.modelConfig) : null,
+      input.originalFilename ?? null,
       Date.now(),
       Date.now(),
     )

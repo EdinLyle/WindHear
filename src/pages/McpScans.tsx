@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { deleteMcpScan, listMcpScans } from '../api'
 import type { McpScanListItem } from '../types'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 
@@ -25,6 +26,10 @@ export function McpScans() {
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected])
+
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogType, setDialogType] = useState<'single' | 'batch' | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize])
 
@@ -68,17 +73,37 @@ export function McpScans() {
   }, [loading])
 
   async function onDelete(id: string) {
-    if (!confirm('确定要删除这条记录吗？')) return
-    await deleteMcpScan(id)
-    await refresh()
+    setPendingDeleteId(id)
+    setDialogType('single')
+    setDialogOpen(true)
   }
 
   async function onBulkDelete() {
     if (selectedIds.length === 0) return
-    if (!confirm(`确定要删除选中的 ${selectedIds.length} 条记录吗？`)) return
-    for (const id of selectedIds) await deleteMcpScan(id)
-    setPage(1)
-    await refresh(undefined, 1)
+    setDialogType('batch')
+    setDialogOpen(true)
+  }
+
+  async function onConfirmDelete() {
+    if (dialogType === 'single' && pendingDeleteId) {
+      await deleteMcpScan(pendingDeleteId)
+      setDialogOpen(false)
+      setDialogType(null)
+      setPendingDeleteId(null)
+      await refresh()
+    } else if (dialogType === 'batch') {
+      for (const id of selectedIds) await deleteMcpScan(id)
+      setDialogOpen(false)
+      setDialogType(null)
+      setPage(1)
+      await refresh(undefined, 1)
+    }
+  }
+
+  function onDialogCancel() {
+    setDialogOpen(false)
+    setDialogType(null)
+    setPendingDeleteId(null)
   }
 
   function onQueryChange(value: string) {
@@ -268,6 +293,12 @@ export function McpScans() {
           </div>
         </div>
       </section>
+      <ConfirmDialog
+        open={dialogOpen}
+        message={dialogType === 'batch' ? `确定要删除选中的 ${selectedIds.length} 条记录吗？` : '确定要删除这条记录吗？'}
+        onConfirm={onConfirmDelete}
+        onCancel={onDialogCancel}
+      />
     </div>
   )
 }

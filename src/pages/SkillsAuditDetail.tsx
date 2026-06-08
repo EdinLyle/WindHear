@@ -266,7 +266,7 @@ export function SkillsAuditDetailPage() {
                   <button className="btn outline sm" onClick={() => getSkillsAuditReport(audit.id, 'pdf')}>导出 PDF</button>
                   <a href={`/api/skills-audit/${audit.id}/report?format=html`} target="_blank" rel="noopener" className="btn outline sm">导出 HTML</a>
                   <a href={`/api/skills-audit/${audit.id}/report?format=md`} target="_blank" rel="noopener" className="btn outline sm">导出 MD</a>
-                  <a href={`/api/skills-audit/${audit.id}/report?format=json`} target="_blank" rel="noopener" className="btn outline sm">导出 JSON</a>
+                  
                 </div>
               </>
             )}

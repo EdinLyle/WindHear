@@ -113,6 +113,7 @@ export function NewSkillsAudit() {
         apiKey: apiKey.trim() || undefined,
         model: model.trim(),
         timeoutMs: timeoutSec * 1000,
+        filename: file.name,
       })
 
       nav(`/evaluation-management/skills/${result.id}`)

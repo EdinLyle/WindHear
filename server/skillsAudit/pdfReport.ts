@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit'
 import type { Response } from 'express'
 import {
-  LIGHT_COLORS, PAGE, registerFonts, contentDisposition,
+  LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
   drawH1, drawCodeBlock, drawSeverityTag, drawLineTag,
   drawTable, drawSeverityBar,
@@ -21,6 +21,7 @@ interface SkillsPdfReportData {
   findings: AgentFinding[]
   severityCount: Record<string, number>
   riskCategoryCount: Record<string, number>
+  createdAt?: number
 }
 
 const SEVERITY_ORDER: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info']
@@ -65,8 +66,7 @@ export function generateSkillsPdfReport(data: SkillsPdfReportData, res: Response
   }
   const { reg, bold, mono, aero, song, fang, tnr } = fonts
 
-  const rawName = (data.name || 'skills-audit-report').replace(/[<>:"/\\|?*\s]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-  const filename = `${rawName}.pdf`
+  const filename = buildReportFilename(data.name, data.createdAt, 'pdf', 'skills-audit')
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', contentDisposition(filename))
 
@@ -95,7 +95,7 @@ export function generateSkillsPdfReport(data: SkillsPdfReportData, res: Response
 
     // 后处理
     const reportId = `SKA-${Date.now()}`
-    postProcessPages(doc, reportId, 'Skills安全审计', reg)
+    postProcessPages(doc, reportId, 'Skills安全审计')
 
     doc.end()
   } catch (err) {
@@ -128,7 +128,7 @@ function drawCoverPage(doc: PDFDoc, data: SkillsPdfReportData, reg: string, aero
   })
 
   // 严重度分布条
-  drawSeverityBar(doc, data.severityCount, data.findingsCount, reg)
+  drawSeverityBar(doc, data.severityCount, data.findingsCount)
 
   // 项目信息（表格：标签方正风雅宋，居中留白）
   doc.moveDown(1.5)

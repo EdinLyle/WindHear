@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit'
 import type { Response } from 'express'
 import {
-  LIGHT_COLORS, PAGE, registerFonts, contentDisposition,
+  LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
   drawH1, drawCodeBlock, drawSeverityTag, drawLineTag,
   drawTable, drawSeverityBar,
@@ -62,14 +62,14 @@ export function generatePdfReport(data: PdfReportData, res: Response): void {
   }
   const { reg: regFont, mono: monoFont, aero: aeroFont, song: songFont, fang: fangFont, tnr: tnrFont } = fonts
 
-  const rawName = (data.name || 'audit-report').replace(/[<>:"/\\|?*\s]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-  const filename = `${rawName}.pdf`
+  const filename = buildReportFilename(data.name, data.createdAt, 'pdf', 'code-audit')
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', contentDisposition(filename))
 
   doc.pipe(res)
 
   try {
+    // 绘制封面页
     // 绘制封面页
     doc.addPage()
     drawCoverPage(doc, data, regFont, aeroFont, songFont, fangFont, tnrFont)
@@ -79,7 +79,7 @@ export function generatePdfReport(data: PdfReportData, res: Response): void {
 
     // 后处理：页眉页脚
     const reportId = `RPT-${Date.now().toString(36).toUpperCase()}`
-    postProcessPages(doc, reportId, data.name, regFont)
+    postProcessPages(doc, reportId, data.name)
 
     doc.end()
   } catch (err) {
@@ -116,7 +116,7 @@ function drawCoverPage(
 
   // 严重度分布条 — 增加间距
   doc.moveDown(1)
-  drawSeverityBar(doc, data.severityCount, data.findingsCount, regFont)
+  drawSeverityBar(doc, data.severityCount, data.findingsCount)
 
   // 项目信息（表格：标签方正风雅宋，居中留白）
   doc.moveDown(1.5)

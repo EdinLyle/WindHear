@@ -15,6 +15,7 @@ import { runSkillsAuditPipeline } from './skillsAudit/pipeline.js';
 import { readFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { buildReportFilename, contentDisposition } from './pdfCommon.js';
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '4mb' }));
@@ -948,13 +949,13 @@ app.get('/api/evaluations/:id/report', async (req, res) => {
     else if (format === 'md') {
         const md = generateEvaluationMd(evaluation, items);
         res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="evaluation-report-${id}.md"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(evaluation.name, evaluation.createdAt, 'md', 'evaluation')));
         res.send(md);
     }
     else if (format === 'html') {
         const html = generateEvaluationHtml(evaluation, items);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="evaluation-report-${id}.html"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(evaluation.name, evaluation.createdAt, 'html', 'evaluation')));
         res.send(html);
     }
     else if (format === 'pdf') {
@@ -1147,25 +1148,29 @@ app.get('/api/mcp-scans/:scanId/report', async (req, res) => {
         const findings = typeof r.findings === 'string' ? JSON.parse(r.findings) : (r.findings || []);
         const pdfData = {
             name: projectName,
+            originalFilename: scan?.original_filename || '',
             status: scan?.status || 'completed',
             scoreTotal: r.score_total,
             scoreRiskLevel: r.score_risk_level,
             projectInfo,
             findings,
+            createdAt: scan?.created_at,
         };
         const { generateMcpPdfReport } = await import('./mcpScan/pdfReport.js');
         generateMcpPdfReport(pdfData, res);
         return;
     }
     else if (format === 'html') {
+        const scan = await mcpStore.getScan(scanId);
         const html = generateMcpReportHtmlFromData(r);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="mcp-report-${scanId}.html"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(scan?.name || scan?.original_filename, scan?.created_at, 'html', 'mcp-scan')));
         res.send(html);
     }
     else if (format === 'md') {
+        const scan = await mcpStore.getScan(scanId);
         res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="mcp-report-${scanId}.md"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(scan?.name || scan?.original_filename, scan?.created_at, 'md', 'mcp-scan')));
         res.send(r.markdown || '# MCP Assessment Report\nNo markdown content available.');
     }
     else {
@@ -1179,6 +1184,7 @@ app.delete('/api/mcp-scans/:scanId', async (req, res) => {
 // ===== Code Audit API =====
 const codeAuditUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const codeAuditFileBuffers = new Map();
+const codeAuditFileNames = new Map(); // fileId → originalname
 app.post('/api/code-audit/upload', codeAuditUpload.single('file'), async (req, res) => {
     if (!req.file) {
         res.status(400).json({ error: '未上传文件' });
@@ -1190,6 +1196,7 @@ app.post('/api/code-audit/upload', codeAuditUpload.single('file'), async (req, r
     }
     const fileId = `ca-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     codeAuditFileBuffers.set(fileId, req.file.buffer);
+    codeAuditFileNames.set(fileId, req.file.originalname);
     res.json({ fileId, filename: req.file.originalname, size: req.file.size });
 });
 app.post('/api/code-audit', async (req, res) => {
@@ -1199,6 +1206,7 @@ app.post('/api/code-audit', async (req, res) => {
         fileId: z.string().optional(),
         sourceUrl: z.string().optional(),
         language: z.string().optional(),
+        filename: z.string().optional(), // 前端也可传filename
         provider: z.enum(['ollama', 'openai', 'anthropic', 'zhipu']).default('openai'),
         baseUrl: z.string().optional(),
         apiKey: z.string().optional(),
@@ -1244,6 +1252,7 @@ app.post('/api/code-audit', async (req, res) => {
         sourceUrl: data.sourceUrl,
         language: data.language,
         modelConfig,
+        originalFilename: data.sourceType === 'zip' ? (data.filename || codeAuditFileNames.get(data.fileId) || '') : '',
     });
     // 异步执行审计流水线
     runCodeAuditPipeline({
@@ -1257,6 +1266,8 @@ app.post('/api/code-audit', async (req, res) => {
     }).finally(() => {
         if (data.fileId)
             codeAuditFileBuffers.delete(data.fileId);
+        if (data.fileId)
+            codeAuditFileNames.delete(data.fileId);
     });
     res.json({ id: auditId, name: data.name, status: 'pending' });
 });
@@ -1281,6 +1292,7 @@ app.get('/api/code-audit', async (req, res) => {
         createdAt: r.created_at,
         completedAt: r.completed_at,
         errorMessage: r.error_message,
+        originalFilename: r.original_filename,
     }));
     res.json({ items, total });
 });
@@ -1463,6 +1475,7 @@ app.get('/api/code-audit/:id/report', async (req, res) => {
     }
     const reportData = {
         name: a.name,
+        originalFilename: a.original_filename || '',
         status: a.status,
         language: a.language,
         riskScore: a.risk_score,
@@ -1485,33 +1498,17 @@ app.get('/api/code-audit/:id/report', async (req, res) => {
     else if (format === 'html') {
         const html = generateHtmlReport(reportData);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="audit-report-${auditId}.html"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(a.name, a.created_at, 'html', 'code-audit')));
         res.send(html);
     }
     else if (format === 'md') {
         const md = generateMarkdownReport(reportData);
         res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="audit-report-${auditId}.md"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(a.name, a.created_at, 'md', 'code-audit')));
         res.send(md);
     }
     else {
-        res.json({
-            audit: {
-                id: a.id,
-                name: a.name,
-                status: a.status,
-                language: a.language,
-                riskScore: a.risk_score,
-                totalFiles: a.total_files,
-                totalSlices: a.total_slices,
-                findingsCount: a.findings_count,
-                severityCount,
-                cweCount,
-                createdAt: a.created_at,
-                completedAt: a.completed_at,
-            },
-            items: items.filter((i) => i.status !== 'false_positive'),
-        });
+        res.status(400).json({ error: '不支持的报告格式' });
     }
 });
 function escapeHtml(str) {
@@ -1760,6 +1757,7 @@ function generateMarkdownReport(data) {
 // ===== Skills Audit API =====
 const skillsAuditUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 const skillsAuditFileBuffers = new Map();
+const skillsAuditFileNames = new Map(); // fileId → originalname
 app.post('/api/skills-audit/upload', skillsAuditUpload.single('file'), async (req, res) => {
     if (!req.file) {
         res.status(400).json({ error: '未上传文件' });
@@ -1771,12 +1769,14 @@ app.post('/api/skills-audit/upload', skillsAuditUpload.single('file'), async (re
     }
     const fileId = `sa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     skillsAuditFileBuffers.set(fileId, req.file.buffer);
+    skillsAuditFileNames.set(fileId, req.file.originalname);
     res.json({ fileId, filename: req.file.originalname, size: req.file.size });
 });
 app.post('/api/skills-audit', async (req, res) => {
     const schema = z.object({
         name: z.string().min(1).max(200),
         fileId: z.string().min(1),
+        filename: z.string().optional(),
         provider: z.enum(['ollama', 'openai', 'anthropic', 'zhipu']).default('openai'),
         baseUrl: z.string().min(1),
         apiKey: z.string().optional(),
@@ -1813,7 +1813,7 @@ app.post('/api/skills-audit', async (req, res) => {
     }
     const auditId = await skillsAuditStore.createAudit({
         name: data.name,
-        originalFilename: '',
+        originalFilename: data.filename || skillsAuditFileNames.get(data.fileId) || '',
         modelConfig,
     });
     // 异步执行审计流水线
@@ -1826,6 +1826,7 @@ app.post('/api/skills-audit', async (req, res) => {
         console.error('Skills audit pipeline error:', err);
     }).finally(() => {
         skillsAuditFileBuffers.delete(data.fileId);
+        skillsAuditFileNames.delete(data.fileId);
     });
     res.json({ id: auditId, name: data.name, status: 'pending' });
 });
@@ -1975,31 +1976,27 @@ app.get('/api/skills-audit/:id/report', async (req, res) => {
             findings,
             severityCount,
             riskCategoryCount,
+            createdAt: audit?.created_at,
         };
         const { generateSkillsPdfReport } = await import('./skillsAudit/pdfReport.js');
         generateSkillsPdfReport(pdfData, res);
         return;
     }
     else if (format === 'md') {
+        const audit = await skillsAuditStore.getAudit(auditId);
         res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="skills-audit-report-${auditId}.md"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(audit?.name, audit?.created_at, 'md', 'skills-audit')));
         res.send(r.markdown);
     }
     else if (format === 'html') {
+        const audit = await skillsAuditStore.getAudit(auditId);
         const html = generateSkillsAuditHtml(r);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="skills-audit-report-${auditId}.html"`);
+        res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(audit?.name, audit?.created_at, 'html', 'skills-audit')));
         res.send(html);
     }
     else {
-        res.json({
-            auditId: r.audit_id,
-            generatedAt: r.generated_at,
-            projectInfo: JSON.parse(r.project_info),
-            findings: JSON.parse(r.findings),
-            scoreTotal: r.score_total,
-            scoreRiskLevel: r.score_risk_level,
-        });
+        res.status(400).json({ error: '不支持的报告格式' });
     }
 });
 app.delete('/api/skills-audit/:id', async (req, res) => {

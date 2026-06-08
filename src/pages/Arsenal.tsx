@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { bulkDeletePrompts, createPrompt, deletePrompt, importPrompts, listPrompts, listCollections, createCollection, deleteCollection } from '../api'
 import type { LibraryType, PromptItem, PromptCollection } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const tabs: Array<{ key: LibraryType; label: string }> = [
   { key: 'all', label: '全部' },
@@ -39,6 +40,10 @@ export function Arsenal() {
   const [newCollName, setNewCollName] = useState('')
   const [newCollDesc, setNewCollDesc] = useState('')
   const [addFormCollectionId, setAddFormCollectionId] = useState<string>('')
+
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogType, setDialogType] = useState<'single' | 'batch' | 'group' | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected])
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize])
@@ -128,18 +133,62 @@ export function Arsenal() {
 
   async function onBulkDelete() {
     if (selectedIds.length === 0) return
-    if (!confirm(`确定要删除选中的 ${selectedIds.length} 条记录吗？`)) return
-    await bulkDeletePrompts(selectedIds)
-    setPage(1)
-    await refresh(undefined, 1)
-    void loadCollections()
+    setDialogType('batch')
+    setDialogOpen(true)
   }
 
   async function onDeleteOne(id: string) {
-    if (!confirm('确定要删除这条记录吗？')) return
-    await deletePrompt(id)
-    await refresh()
-    void loadCollections()
+    setPendingDeleteId(id)
+    setDialogType('single')
+    setDialogOpen(true)
+  }
+
+  async function onDeleteCollection(id: string) {
+    setPendingDeleteId(id)
+    setDialogType('group')
+    setDialogOpen(true)
+  }
+
+  async function onConfirmDelete() {
+    if (dialogType === 'single' && pendingDeleteId) {
+      await deletePrompt(pendingDeleteId)
+      setDialogOpen(false)
+      setDialogType(null)
+      setPendingDeleteId(null)
+      await refresh()
+      void loadCollections()
+    } else if (dialogType === 'batch') {
+      await bulkDeletePrompts(selectedIds)
+      setDialogOpen(false)
+      setDialogType(null)
+      setPage(1)
+      await refresh(undefined, 1)
+      void loadCollections()
+    } else if (dialogType === 'group' && pendingDeleteId) {
+      try {
+        await deleteCollection(pendingDeleteId)
+        setDialogOpen(false)
+        setDialogType(null)
+        setPendingDeleteId(null)
+        if (selectedCollectionId === pendingDeleteId) {
+          setSelectedCollectionId('')
+          void refresh(undefined, 1, undefined, '')
+        } else {
+          void loadCollections()
+        }
+      } catch (e: unknown) {
+        setDialogOpen(false)
+        setDialogType(null)
+        setPendingDeleteId(null)
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    }
+  }
+
+  function onDialogCancel() {
+    setDialogOpen(false)
+    setDialogType(null)
+    setPendingDeleteId(null)
   }
 
   async function onImportFile(file: File) {
@@ -200,20 +249,6 @@ export function Arsenal() {
       setSelectedCollectionId(resp.id)
       void loadCollections()
       void refresh(undefined, 1, undefined, resp.id)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  async function onDeleteCollection(id: string) {
-    if (!confirm('确定要删除此测试集分组吗？分组下的提示词将不会被删除。')) return
-    try {
-      await deleteCollection(id)
-      if (selectedCollectionId === id) {
-        setSelectedCollectionId('')
-        void refresh(undefined, 1, undefined, '')
-      }
-      void loadCollections()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -678,6 +713,18 @@ export function Arsenal() {
           </div>
         </div>
       </section>
+      <ConfirmDialog
+        open={dialogOpen}
+        message={
+          dialogType === 'batch'
+            ? `确定要删除选中的 ${selectedIds.length} 条记录吗？`
+            : dialogType === 'group'
+              ? '确定要删除此测试集分组吗？分组下的提示词将不会被删除。'
+              : '确定要删除这条记录吗？'
+        }
+        onConfirm={onConfirmDelete}
+        onCancel={onDialogCancel}
+      />
     </div>
   )
 }

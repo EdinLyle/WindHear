@@ -124,6 +124,7 @@ export function NewCodeAudit() {
         apiKey: apiKey.trim() || undefined,
         model: model.trim(),
         timeoutMs: timeoutSec * 1000,
+        filename: sourceType === 'zip' && file ? file.name : undefined,
       })
 
       nav(`/code-audit/${result.id}`)

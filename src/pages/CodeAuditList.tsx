@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { deleteCodeAudit, listCodeAudits } from '../api'
 import type { CodeAuditListItem } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const PAGE_SIZE = 10
 
@@ -48,6 +49,8 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const [language, setLanguage] = useState('all')
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const refresh = useCallback(async (nextPage?: number, nextQuery?: string, nextLanguage?: string) => {
@@ -79,8 +82,15 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
   }
 
   async function onDelete(id: number) {
-    if (!confirm('确定要删除这条审计记录吗？')) return
-    await deleteCodeAudit(id)
+    setPendingDeleteId(id)
+    setDialogOpen(true)
+  }
+
+  async function onConfirmDelete() {
+    if (pendingDeleteId == null) return
+    await deleteCodeAudit(pendingDeleteId)
+    setDialogOpen(false)
+    setPendingDeleteId(null)
     void refresh()
   }
 
@@ -229,6 +239,12 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
           </div>
         </div>
       </section>
+      <ConfirmDialog
+        open={dialogOpen}
+        message="确定要删除这条审计记录吗？"
+        onConfirm={onConfirmDelete}
+        onCancel={() => { setDialogOpen(false); setPendingDeleteId(null) }}
+      />
     </div>
   )
 }

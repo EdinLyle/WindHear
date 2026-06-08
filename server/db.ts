@@ -421,6 +421,14 @@ async function migrate(db: Awaited<ReturnType<typeof open>>) {
     await db.exec('ALTER TABLE code_audit_items ADD COLUMN fix_code TEXT;')
   }
 
+  // code_audits 增加 original_filename 列
+  const auditColumns = await db.all<Array<{ name: string }>>(
+    'PRAGMA table_info(code_audits);'
+  )
+  if (!auditColumns.some(col => col.name === 'original_filename')) {
+    await db.exec('ALTER TABLE code_audits ADD COLUMN original_filename TEXT;')
+  }
+
   // ===== SkillsAudit 模块表 =====
   await db.exec(`
     CREATE TABLE IF NOT EXISTS skills_audits (

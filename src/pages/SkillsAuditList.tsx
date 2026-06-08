@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { deleteSkillsAudit, listSkillsAudits } from '../api'
 import type { SkillsAuditListItem } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const PAGE_SIZE = 10
 
@@ -71,6 +72,8 @@ export function SkillsAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean }
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const [riskLevel, setRiskLevel] = useState('all')
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const refresh = useCallback(async (nextPage?: number, nextQuery?: string, nextRiskLevel?: string) => {
@@ -102,8 +105,15 @@ export function SkillsAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean }
   }
 
   async function onDelete(id: number) {
-    if (!confirm('确定要删除这条Skills 安全审计记录吗？')) return
-    await deleteSkillsAudit(id)
+    setPendingDeleteId(id)
+    setDialogOpen(true)
+  }
+
+  async function onConfirmDelete() {
+    if (pendingDeleteId == null) return
+    await deleteSkillsAudit(pendingDeleteId)
+    setDialogOpen(false)
+    setPendingDeleteId(null)
     void refresh()
   }
 
@@ -245,6 +255,12 @@ export function SkillsAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean }
           </div>
         </div>
       </section>
+      <ConfirmDialog
+        open={dialogOpen}
+        message="确定要删除这条Skills 安全审计记录吗？"
+        onConfirm={onConfirmDelete}
+        onCancel={() => { setDialogOpen(false); setPendingDeleteId(null) }}
+      />
     </div>
   )
 }

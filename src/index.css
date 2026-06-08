@@ -517,6 +517,47 @@ body::-webkit-scrollbar-track {
 }
 
 /* ========================================
+ * Confirm Dialog Styles
+ * ======================================== */
+
+.confirmBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmCard {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  min-width: 320px;
+  max-width: 480px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.confirmCard .cardHeader {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.confirmBody {
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+}
+
+/* ========================================
  * Print Styles
  * ======================================== */
 @media print {

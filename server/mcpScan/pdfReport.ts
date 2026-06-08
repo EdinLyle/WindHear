@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit'
 import type { Response } from 'express'
 import {
-  LIGHT_COLORS, PAGE, registerFonts, contentDisposition,
+  LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
   drawH1, drawCodeBlock, drawSeverityTag, drawLineTag,
   drawTable, drawSeverityBar,
@@ -54,6 +54,7 @@ interface McpPdfReportData {
     mcpServersCount?: number
   }
   findings: McpFinding[]
+  createdAt?: number
 }
 
 const SEVERITY_ORDER: readonly SeverityLevel[] = ['critical', 'high', 'medium', 'low', 'info']
@@ -86,8 +87,7 @@ export function generateMcpPdfReport(data: McpPdfReportData, res: Response): voi
   }
   const { reg, mono, aero, song, fang, tnr } = fonts
 
-  const rawName = (data.name || 'mcp-report').replace(/[<>:"/\\|?*\s]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-  const filename = `${rawName}.pdf`
+  const filename = buildReportFilename(data.name, data.createdAt, 'pdf', 'mcp-scan')
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', contentDisposition(filename))
 
@@ -99,11 +99,11 @@ export function generateMcpPdfReport(data: McpPdfReportData, res: Response): voi
     drawCoverPage(doc, data, reg, aero, song, fang, tnr)
 
     // 漏洞详情页
-    drawVulnerabilityPages(doc, data, reg, mono, aero, song, fang, tnr)
+    drawVulnerabilityPages(doc, data, reg, mono, aero, song, fang)
 
     // 后处理
     const reportId = `MCP-${Date.now()}`
-    postProcessPages(doc, reportId, 'MCP安全评估', reg)
+    postProcessPages(doc, reportId, 'MCP安全评估')
 
     doc.end()
   } catch (err) {
@@ -136,7 +136,7 @@ function drawCoverPage(doc: PDFDoc, data: McpPdfReportData, reg: string, aero: s
   })
 
   // 严重度分布条
-  drawSeverityBar(doc, sevCount, data.findings.length, reg)
+  drawSeverityBar(doc, sevCount, data.findings.length)
 
   // 项目信息（表格：标签方正风雅宋，居中留白）
   doc.moveDown(1.5)
@@ -189,7 +189,7 @@ function groupBySeverity(items: McpFinding[]): Record<SeverityLevel, McpFinding[
  */
 function drawVulnerabilityPages(
   doc: PDFDoc, data: McpPdfReportData,
-  reg: string, mono: string, aero: string, song: string, fang: string, _tnr: string
+  reg: string, mono: string, aero: string, song: string, fang: string
 ): void {
   if (!data.findings || data.findings.length === 0) return
 
@@ -209,7 +209,7 @@ function drawVulnerabilityPages(
     for (const item of items) {
       vulnIndex++
       ensureSpace(doc, 100)
-      drawVulnCard(doc, item, sev, vulnIndex, reg, mono, aero, song, fang, _tnr)
+      drawVulnCard(doc, item, sev, vulnIndex, reg, mono, aero, song, fang)
     }
   }
 }
@@ -217,7 +217,7 @@ function drawVulnerabilityPages(
 /** 绘制单个漏洞卡片 */
 function drawVulnCard(
   doc: PDFDoc, item: McpFinding, severity: SeverityLevel, index: number,
-  reg: string, mono: string, aero: string, song: string, fang: string, _tnr: string
+  reg: string, mono: string, aero: string, song: string, fang: string
 ): void {
   const indent = PAGE.MARGIN_LEFT + 8
   const contentW = PAGE.CONTENT_WIDTH - 16
