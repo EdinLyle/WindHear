@@ -129,6 +129,8 @@ export interface AgentContext {
     model?: string
     systemPrompt?: string
     timeoutMs?: number
+    taskId?: string
+    module?: string
   }
   /** 漏洞知识库 */
   vulnKbPatterns: Array<{ cweId: string; cweName: string; riskPattern: string; severity: string }>
@@ -147,6 +149,8 @@ export interface PipelineContext {
     model?: string
     systemPrompt?: string
     timeoutMs?: number
+    taskId?: string
+    module?: string
   }
   // 以下字段在流水线各阶段填充
   projectFiles: ProjectFile[]

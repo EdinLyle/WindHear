@@ -91,13 +91,15 @@ ${fileContents || '无相关文件'}
 请分析以上信息，识别${riskCategories.join('/')}相关的安全风险，以JSON数组格式返回。`
 
   try {
-    const response = await chatCompletion(
+    const responseResult = await chatCompletion(
       {
         provider: ctx.modelConfig.provider,
         baseUrl: ctx.modelConfig.baseUrl,
         apiKey: ctx.modelConfig.apiKey,
         model: ctx.modelConfig.model,
         timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000,
+        taskId: ctx.modelConfig.taskId,
+        module: ctx.modelConfig.module,
       },
       [
         { role: 'system', content: effectiveSystemPrompt },
@@ -106,7 +108,7 @@ ${fileContents || '无相关文件'}
     )
 
     // 解析LLM返回的JSON
-    const jsonMatch = response.match(/\[[\s\S]*\]/)
+    const jsonMatch = responseResult.content.match(/\[[\s\S]*\]/)
     if (!jsonMatch) return []
 
     const findings = JSON.parse(jsonMatch[0]) as Array<Record<string, unknown>>

@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { getMcpScanReport, getMcpScanStatus, getMcpScanReportUrl } from '../api'
 import type { McpScanListItem, McpScanReport as McpScanReportData } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import TokenReceiptModal from '../components/TokenReceiptModal'
 
 type LocationState = {
   initialStatus?: McpScanListItem
@@ -16,6 +17,7 @@ export function McpScanReport({ scanId: propScanId }: { scanId?: string } = {}) 
   const [report, setReport] = useState<McpScanReportData | null>(null)
   const [status, setStatus] = useState<McpScanListItem | null>(initialStatus)
   const [error, setError] = useState('')
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
 
   const shouldPoll = status?.status === 'running' || status?.status === 'pending'
   const isCompleted = status?.status === 'completed' && !!report
@@ -106,6 +108,7 @@ export function McpScanReport({ scanId: propScanId }: { scanId?: string } = {}) 
             {shouldPoll ? <span className="muted">扫描进行中，自动刷新…</span> : null}
             {isCompleted ? (
               <>
+                <button className="btn secondary" type="button" onClick={() => setShowReceiptModal(true)}>查看 Token 小票</button>
                 <button className="btn secondary" type="button" onClick={onExport}>导出HTML</button>
                 <button className="btn secondary" type="button" onClick={() => { if (scanId) window.open(getMcpScanReportUrl(scanId, 'pdf'), '_blank') }}>导出PDF</button>
                 <button className="btn secondary" type="button" onClick={() => { if (scanId) window.open(getMcpScanReportUrl(scanId, 'md'), '_blank') }}>导出MD</button>
@@ -289,6 +292,13 @@ export function McpScanReport({ scanId: propScanId }: { scanId?: string } = {}) 
           </div>
         )}
       </section>
+
+      <TokenReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        taskId={scanId || ''}
+        module="mcp"
+      />
     </div>
   )
 }

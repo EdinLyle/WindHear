@@ -2427,6 +2427,97 @@ function generateSkillsAuditHtml(data: any, audit: any): string {
 </html>`
 }
 
+import { getTokenUsagesByTaskId, getTokenUsagesBySessionId } from './db.js'
+import { getPricingData, getSupportedModels } from './services/pricingService.js'
+import type { TokenReceiptData, TokenUsageRow } from './types.js'
+
+// ─── Token 小票 & 价格 API ───────────────────────────────────────────
+
+/** 按 taskId 获取 Token 消耗小票 */
+app.get('/api/receipt/:taskId', async (req, res) => {
+  try {
+    const rows = await getTokenUsagesByTaskId(req.params.taskId)
+    if (rows.length === 0) {
+      res.json({ receipts: [], totalCost: 0, totalTokens: 0 })
+      return
+    }
+    const receipts = rows.map(rowToReceipt)
+    const totalCost = sumCosts(receipts)
+    const totalTokens = receipts.reduce((s, r) => s + r.totalTokens, 0)
+    res.json({ receipts, totalCost, totalTokens })
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch token receipt', detail: err.message })
+  }
+})
+
+/** 按 sessionId 获取 Token 消耗小票 */
+app.get('/api/receipt/:taskId/session', async (req, res) => {
+  try {
+    const sessionId = req.query.sessionId as string
+    if (!sessionId) {
+      res.status(400).json({ error: 'sessionId query parameter is required' })
+      return
+    }
+    const rows = await getTokenUsagesBySessionId(sessionId)
+    if (rows.length === 0) {
+      res.json({ receipts: [], totalCost: 0, totalTokens: 0 })
+      return
+    }
+    const receipts = rows.map(rowToReceipt)
+    const totalCost = sumCosts(receipts)
+    const totalTokens = receipts.reduce((s, r) => s + r.totalTokens, 0)
+    res.json({ receipts, totalCost, totalTokens })
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch token receipt', detail: err.message })
+  }
+})
+
+/** 获取支持的模型列表及价格 */
+app.get('/api/pricing/models', (_req, res) => {
+  res.json({
+    models: getSupportedModels(),
+    pricing: getPricingData(),
+  })
+})
+
+/** 辅助：DB 行 → TokenReceiptData */
+function rowToReceipt(row: TokenUsageRow): TokenReceiptData {
+  return {
+    taskId: row.task_id,
+    sessionId: row.session_id ?? '',
+    module: row.module,
+    provider: row.provider,
+    model: row.model,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    cachedInputTokens: row.cached_input_tokens ?? undefined,
+    reasoningTokens: row.reasoning_tokens ?? undefined,
+    totalTokens: row.total_tokens,
+    costAmount: row.cost_amount,
+    costCurrency: (row.cost_currency as 'USD' | 'CNY') ?? 'UNMAPPED',
+    timestamp: row.timestamp,
+    receiptId: `R-${row.id.toString().padStart(8, '0')}`,
+  }
+}
+
+/** 辅助：汇总成本（按币种分组） */
+function sumCosts(receipts: TokenReceiptData[]): Record<string, number> {
+  const totals: Record<string, number> = {}
+  for (const r of receipts) {
+    if (r.costAmount != null) {
+      const cur = r.costCurrency
+      totals[cur] = (totals[cur] ?? 0) + r.costAmount
+    }
+  }
+  // 保留6位小数
+  for (const k of Object.keys(totals)) {
+    totals[k] = parseFloat(totals[k].toFixed(6))
+  }
+  return totals
+}
+
+// ─── End Token 小票 & 价格 API ───────────────────────────────────────
+
 const port = Number(process.env.PORT ?? 3001)
 app.listen(port, () => {
   process.stdout.write(`API listening on http://localhost:${port}\n`)
@@ -2524,8 +2615,8 @@ async function pingModel(input: { provider: 'ollama' | 'openai' | 'anthropic' | 
   const timeouts = [20_000, 40_000]
   for (let i = 0; i < timeouts.length; i++) {
     try {
-      const content = await chatCompletion({ ...input, timeoutMs: timeouts[i] }, [{ role: 'user', content: 'ping' }])
-      return { ok: true, latencyMs: Date.now() - started, outputPreview: content.slice(0, 160) }
+      const result = await chatCompletion({ ...input, timeoutMs: timeouts[i] }, [{ role: 'user', content: 'ping' }])
+      return { ok: true, latencyMs: Date.now() - started, outputPreview: result.content.slice(0, 160) }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       const isAbort =

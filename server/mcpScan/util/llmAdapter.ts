@@ -7,15 +7,19 @@ export async function callLlm(input: {
   modelHint: 'default' | 'thinking' | 'coding' | 'fast'
   temperature: number
   options?: ScanOptions
+  taskId?: string
+  module?: string
 }): Promise<string> {
-  const { roleSystem, user, options } = input
+  const { roleSystem, user, options, taskId, module } = input
 
   const modelConfig: ModelConfig = {
     provider: options?.provider || (options?.baseUrl?.includes('ollama') ? 'ollama' : 'openai'),
     baseUrl: options?.baseUrl || 'https://api.openai.com/v1',
     apiKey: options?.apiKey,
     model: options?.model || 'gpt-4o',
-    timeoutMs: options?.timeoutMs ?? 60000
+    timeoutMs: options?.timeoutMs ?? 60000,
+    taskId,
+    module: module || 'mcp',
   }
 
   const response = await chatCompletion(modelConfig, [
@@ -23,5 +27,5 @@ export async function callLlm(input: {
     { role: 'user', content: user }
   ])
 
-  return response
+  return response.content
 }

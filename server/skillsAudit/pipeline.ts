@@ -35,6 +35,8 @@ export async function runSkillsAuditPipeline(input: {
     apiKey?: string
     model?: string
     systemPrompt?: string
+    taskId?: string
+    module?: string
   }
 }) {
   const { auditId, store, modelConfig } = input
@@ -45,7 +47,11 @@ export async function runSkillsAuditPipeline(input: {
     extractDir,
     store,
     zipBuffer: input.zipBuffer,
-    modelConfig,
+    modelConfig: {
+      ...modelConfig,
+      taskId: String(auditId),
+      module: 'skills-audit',
+    },
     projectFiles: [],
     totalFiles: 0,
     skills: [],

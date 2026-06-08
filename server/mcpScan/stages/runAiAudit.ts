@@ -51,6 +51,8 @@ export async function runAiAudit(input: {
     modelHint: 'coding',
     temperature: 0.2,
     options,
+    taskId: scanId,
+    module: 'mcp',
   });
 
   await fs.writeFile(path.join(rootDir, '.mcpscan_audit_raw.txt'), completion, 'utf8');

@@ -67,5 +67,7 @@ export interface PipelineContext {
     model?: string
     systemPrompt?: string
     timeoutMs?: number
+    taskId?: string
+    module?: string
   }
 }

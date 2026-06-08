@@ -56,13 +56,14 @@ ${slicesDescription}
 只输出 JSON 数组，不要输出其他内容。`
 
   try {
-    const response = await chatCompletion(
+    const result = await chatCompletion(
       { ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000 },
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
     )
+    const response = result.content
     const parsed = safeParseJsonArray(response) as Record<string, unknown>[]
     return slices.map((_, idx) => {
       const match = parsed.find(p => p.index === idx)
@@ -177,14 +178,14 @@ ${slicesDescription}
 只输出 JSON 数组，如果没有发现漏洞输出空数组 []。`
 
   try {
-    const response = await chatCompletion(
+    const responseResult = await chatCompletion(
       { ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 90_000 },
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
     )
-    const parsed = safeParseJsonArray(response) as Record<string, unknown>[]
+    const parsed = safeParseJsonArray(responseResult.content) as Record<string, unknown>[]
     const findings: RawFinding[] = []
 
     for (const item of parsed) {
@@ -254,14 +255,14 @@ ${findingsDescription}
 只输出 JSON 数组。`
 
   try {
-    const response = await chatCompletion(
+    const responseResult = await chatCompletion(
       { ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 90_000 },
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
     )
-    const parsed = safeParseJsonArray(response) as Record<string, unknown>[]
+    const parsed = safeParseJsonArray(responseResult.content) as Record<string, unknown>[]
 
     return findings.map((f, idx) => {
       const match = parsed.find(p => p.index === idx)
@@ -316,11 +317,11 @@ ${findingsSummary}
 只输出摘要文本，不要输出 JSON。`
 
   try {
-    const summary = await chatCompletion(
+    const summaryResult = await chatCompletion(
       { ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000 },
       [{ role: 'user', content: prompt }],
     )
-    return { riskScore, summary: summary.trim(), findings: confirmedFindings }
+    return { riskScore, summary: summaryResult.content.trim(), findings: confirmedFindings }
   } catch {
     return {
       riskScore,

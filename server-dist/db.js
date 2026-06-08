@@ -4,12 +4,20 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+// 模块级 db Promise 缓存，供 insertTokenUsage 等函数使用
+let _dbPromise = null;
+export function openDb() {
+    if (!_dbPromise) {
+        _dbPromise = doOpenDb();
+    }
+    return _dbPromise;
+}
 function getDbPath() {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     return path.resolve(__dirname, '..', 'data', 'tingfeng.db');
 }
-export async function openDb() {
+async function doOpenDb() {
     const filename = getDbPath();
     await fs.mkdir(path.dirname(filename), { recursive: true });
     const db = await open({
@@ -526,4 +534,63 @@ async function migrate(db) {
         }
         await stmt.finalize();
     }
+    // ===== Token Usages 小票表 =====
+    await db.exec(`
+    CREATE TABLE IF NOT EXISTS token_usages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id TEXT NOT NULL,
+      session_id TEXT,
+      module TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cached_input_tokens INTEGER DEFAULT 0,
+      reasoning_tokens INTEGER DEFAULT 0,
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      model TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      cost_amount DECIMAL(10,6),
+      cost_currency TEXT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_token_usages_task_id ON token_usages(task_id);
+    CREATE INDEX IF NOT EXISTS idx_token_usages_session_id ON token_usages(session_id);
+    CREATE INDEX IF NOT EXISTS idx_token_usages_timestamp ON token_usages(timestamp DESC);
+  `);
+}
+/** 写入 token 使用记录（同步，使用 better-sqlite3 风格的 db.run） */
+export function insertTokenUsage(usage) {
+    // 由于 db 是异步打开的，我们需要在运行时获取 db 实例
+    // 使用全局 dbPromise 确保 db 已初始化
+    insertTokenUsageAsync(usage).catch(e => {
+        console.error('insertTokenUsage failed:', e);
+    });
+}
+async function insertTokenUsageAsync(usage) {
+    const db = await openDb();
+    await db.run(`INSERT INTO token_usages (task_id, session_id, module, input_tokens, output_tokens, cached_input_tokens, reasoning_tokens, total_tokens, model, provider, cost_amount, cost_currency)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, [
+        usage.taskId,
+        usage.sessionId ?? null,
+        usage.module,
+        usage.inputTokens,
+        usage.outputTokens,
+        usage.cachedInputTokens ?? null,
+        usage.reasoningTokens ?? null,
+        usage.totalTokens,
+        usage.model,
+        usage.provider,
+        usage.costAmount ?? null,
+        usage.costCurrency ?? null,
+    ]);
+}
+/** 按 taskId 查询 token 使用记录 */
+export async function getTokenUsagesByTaskId(taskId) {
+    const db = await openDb();
+    return db.all('SELECT * FROM token_usages WHERE task_id = ? ORDER BY timestamp ASC;', [taskId]);
+}
+/** 按 sessionId 查询累计 token 使用 */
+export async function getTokenUsagesBySessionId(sessionId) {
+    const db = await openDb();
+    return db.all('SELECT * FROM token_usages WHERE session_id = ? ORDER BY timestamp ASC;', [sessionId]);
 }

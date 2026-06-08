@@ -108,7 +108,11 @@ export async function runCodeAuditPipeline(input) {
             rawFindings: [],
             validatedFindings: [],
             vulnKbPatterns,
-            modelConfig,
+            modelConfig: {
+                ...modelConfig,
+                taskId: String(auditId),
+                module: 'code-audit',
+            },
         };
         // Parser
         await store.addLog(auditId, 'auditing', 'Parser Agent 开始分析...');

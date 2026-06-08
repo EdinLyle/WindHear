@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getCodeAuditDetail, getCodeAuditItems, getCodeAuditSlices, updateCodeAuditItemStatus } from '../api'
 import type { AuditItemStatus, AuditSeverity, CodeAuditDetail as AuditDetailType, CodeAuditItem, CodeAuditSlice } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import TokenReceiptModal from '../components/TokenReceiptModal'
 
 const severityColors: Record<string, string> = {
   critical: '#dc2626',
@@ -336,6 +337,7 @@ export function CodeAuditDetailPage() {
   const [severityFilter, setSeverityFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
 
   const isRunning = audit ? !['completed', 'failed'].includes(audit.status) : false
 
@@ -477,6 +479,7 @@ export function CodeAuditDetailPage() {
                   风险评分: {audit.riskScore}/100
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn outline sm" onClick={() => setShowReceiptModal(true)}>查看 Token 小票</button>
                   <a href={`/api/code-audit/${audit.id}/report?format=pdf`} target="_blank" rel="noopener" className="btn outline sm">导出 PDF</a>
                   <a href={`/api/code-audit/${audit.id}/report?format=html`} target="_blank" rel="noopener" className="btn outline sm">导出 HTML</a>
                   <a href={`/api/code-audit/${audit.id}/report?format=md`} target="_blank" rel="noopener" className="btn outline sm">导出 MD</a>
@@ -641,6 +644,13 @@ export function CodeAuditDetailPage() {
           )}
         </section>
       )}
+
+      <TokenReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        taskId={String(auditId)}
+        module="code-audit"
+      />
     </div>
   )
 }

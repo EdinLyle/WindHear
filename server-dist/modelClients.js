@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { insertTokenUsage } from './db.js';
+import { estimateCost } from './services/pricingService.js';
 export async function chatCompletion(config, messages) {
     if (config.provider === 'ollama') {
         return ollamaChat(config, messages);
@@ -9,6 +11,7 @@ export async function chatCompletion(config, messages) {
     if (config.provider === 'zhipu') {
         return zhipuChat(config, messages);
     }
+    // openai, deepseek (both use OpenAI-compatible API)
     return openaiChat(config, messages);
 }
 async function ollamaChat(config, messages) {
@@ -36,7 +39,10 @@ async function ollamaChat(config, messages) {
     if (!parsed.success) {
         throw new Error('Ollama响应解析失败');
     }
-    return parsed.data.message.content;
+    // Ollama 无标准 usage，返回 undefined
+    const result = { content: parsed.data.message.content, usage: undefined };
+    recordTokenUsage(config, result.usage);
+    return result;
 }
 async function openaiChat(config, messages) {
     const baseUrl = config.baseUrl.replace(/\/$/, '');
@@ -66,7 +72,20 @@ async function openaiChat(config, messages) {
     if (!parsed.success) {
         throw new Error('OpenAI响应解析失败');
     }
-    return parsed.data.choices[0].message.content ?? '';
+    const usage = json.usage;
+    const tokenUsage = usage ? {
+        inputTokens: usage.prompt_tokens || 0,
+        outputTokens: usage.completion_tokens || 0,
+        totalTokens: usage.total_tokens || 0,
+        model: config.model ?? '',
+        provider: config.provider,
+        timestamp: new Date().toISOString(),
+        taskId: config.taskId || '',
+        module: config.module || '',
+    } : undefined;
+    const result = { content: parsed.data.choices[0].message.content ?? '', usage: tokenUsage };
+    recordTokenUsage(config, result.usage);
+    return result;
 }
 async function anthropicChat(config, messages) {
     const baseUrl = config.baseUrl.replace(/\/$/, '');
@@ -108,7 +127,22 @@ async function anthropicChat(config, messages) {
     }
     // 提取第一个 text 类型的 content block
     const textBlock = parsed.data.content.find(b => b.type === 'text' && b.text);
-    return textBlock?.text ?? '';
+    // 提取 usage（Anthropic 格式）
+    const usage = json.usage;
+    const tokenUsage = usage ? {
+        inputTokens: usage.input_tokens || 0,
+        outputTokens: usage.output_tokens || 0,
+        cachedInputTokens: usage.cache_read_input_tokens,
+        totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+        model: config.model ?? '',
+        provider: config.provider,
+        timestamp: new Date().toISOString(),
+        taskId: config.taskId || '',
+        module: config.module || '',
+    } : undefined;
+    const result = { content: textBlock?.text ?? '', usage: tokenUsage };
+    recordTokenUsage(config, result.usage);
+    return result;
 }
 async function zhipuChat(config, messages) {
     const baseUrl = config.baseUrl.replace(/\/$/, '');
@@ -141,7 +175,50 @@ async function zhipuChat(config, messages) {
     if (!parsed.success) {
         throw new Error('智谱响应解析失败');
     }
-    return parsed.data.choices[0].message.content ?? '';
+    // 提取 usage（智谱兼容 OpenAI 格式）
+    const usage = json.usage;
+    const tokenUsage = usage ? {
+        inputTokens: usage.prompt_tokens || 0,
+        outputTokens: usage.completion_tokens || 0,
+        totalTokens: usage.total_tokens || 0,
+        model: config.model ?? '',
+        provider: config.provider,
+        timestamp: new Date().toISOString(),
+        taskId: config.taskId || '',
+        module: config.module || '',
+    } : undefined;
+    const result = { content: parsed.data.choices[0].message.content ?? '', usage: tokenUsage };
+    recordTokenUsage(config, result.usage);
+    return result;
+}
+/** 集中式 Token 使用记录写入 */
+function recordTokenUsage(config, usage) {
+    if (!usage)
+        return;
+    if (!usage.taskId) {
+        console.warn('[recordTokenUsage] Skipping: taskId is empty (model=%s, provider=%s)', config.model, config.provider);
+        return;
+    }
+    try {
+        const cost = estimateCost(usage);
+        insertTokenUsage({
+            taskId: usage.taskId,
+            sessionId: config.sessionId,
+            module: usage.module,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            cachedInputTokens: usage.cachedInputTokens,
+            reasoningTokens: usage.reasoningTokens,
+            totalTokens: usage.totalTokens,
+            model: usage.model,
+            provider: usage.provider,
+            costAmount: cost.amount,
+            costCurrency: cost.currency === 'UNMAPPED' ? undefined : cost.currency,
+        });
+    }
+    catch (e) {
+        console.error('Failed to record token usage:', e);
+    }
 }
 async function fetchWithTimeout(url, init, timeoutMs) {
     const ms = typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs : 30_000;

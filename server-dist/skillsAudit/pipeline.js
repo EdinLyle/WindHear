@@ -27,7 +27,11 @@ export async function runSkillsAuditPipeline(input) {
         extractDir,
         store,
         zipBuffer: input.zipBuffer,
-        modelConfig,
+        modelConfig: {
+            ...modelConfig,
+            taskId: String(auditId),
+            module: 'skills-audit',
+        },
         projectFiles: [],
         totalFiles: 0,
         skills: [],

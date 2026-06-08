@@ -363,3 +363,52 @@ export type SkillsAuditItem = {
   status: AuditItemStatus
   createdAt: number
 }
+
+// ===== Token Receipt Types =====
+
+export interface TokenUsage {
+  inputTokens: number
+  outputTokens: number
+  cachedInputTokens?: number
+  reasoningTokens?: number
+  totalTokens: number
+  model: string
+  provider: string
+  timestamp: string
+  taskId: string
+  module: string
+}
+
+export interface CostEstimate {
+  amount: number | null
+  currency: 'USD' | 'CNY' | 'UNMAPPED'
+  breakdown?: {
+    inputCost: number
+    outputCost: number
+  }
+}
+
+export interface TokenReceiptData {
+  taskId: string
+  sessionId: string
+  module: string
+  provider: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  cachedInputTokens?: number
+  reasoningTokens?: number
+  totalTokens: number
+  costAmount: number | null
+  costCurrency: 'USD' | 'CNY' | 'UNMAPPED'
+  timestamp: string
+  receiptId: string
+}
+
+export interface PricingModel {
+  provider: string
+  model: string
+  inputPrice: number
+  outputPrice: number
+  currency: 'USD' | 'CNY'
+}

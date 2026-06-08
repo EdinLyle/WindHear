@@ -34,10 +34,11 @@ ${slicesDescription}
 
 只输出 JSON 数组，不要输出其他内容。`;
     try {
-        const response = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000 }, [
+        const result = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000 }, [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
         ]);
+        const response = result.content;
         const parsed = safeParseJsonArray(response);
         return slices.map((_, idx) => {
             const match = parsed.find(p => p.index === idx);
@@ -128,11 +129,11 @@ ${slicesDescription}
 
 只输出 JSON 数组，如果没有发现漏洞输出空数组 []。`;
     try {
-        const response = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 90_000 }, [
+        const responseResult = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 90_000 }, [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
         ]);
-        const parsed = safeParseJsonArray(response);
+        const parsed = safeParseJsonArray(responseResult.content);
         const findings = [];
         for (const item of parsed) {
             const row = item;
@@ -187,11 +188,11 @@ ${findingsDescription}
 
 只输出 JSON 数组。`;
     try {
-        const response = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 90_000 }, [
+        const responseResult = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 90_000 }, [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
         ]);
-        const parsed = safeParseJsonArray(response);
+        const parsed = safeParseJsonArray(responseResult.content);
         return findings.map((f, idx) => {
             const match = parsed.find(p => p.index === idx);
             const adjSeverity = String(match?.adjustedSeverity ?? '');
@@ -237,8 +238,8 @@ ${findingsSummary}
 
 只输出摘要文本，不要输出 JSON。`;
     try {
-        const summary = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000 }, [{ role: 'user', content: prompt }]);
-        return { riskScore, summary: summary.trim(), findings: confirmedFindings };
+        const summaryResult = await chatCompletion({ ...ctx.modelConfig, timeoutMs: ctx.modelConfig.timeoutMs ?? 60_000 }, [{ role: 'user', content: prompt }]);
+        return { riskScore, summary: summaryResult.content.trim(), findings: confirmedFindings };
     }
     catch {
         return {

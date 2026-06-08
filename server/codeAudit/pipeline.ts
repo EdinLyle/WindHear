@@ -55,6 +55,8 @@ export async function runCodeAuditPipeline(input: {
     apiKey?: string
     model?: string
     systemPrompt?: string
+    taskId?: string
+    module?: string
   }
 }) {
   const { auditId, store, modelConfig } = input
@@ -135,7 +137,11 @@ export async function runCodeAuditPipeline(input: {
       rawFindings: [],
       validatedFindings: [],
       vulnKbPatterns,
-      modelConfig,
+      modelConfig: {
+        ...modelConfig,
+        taskId: String(auditId),
+        module: 'code-audit',
+      },
     }
 
     // Parser

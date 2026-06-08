@@ -20,6 +20,8 @@ async function runEvaluation(db, evaluationId) {
         apiKey: evaluation.targetApiKey ?? undefined,
         model: evaluation.targetModel ?? undefined,
         timeoutMs: evaluation.targetTimeoutMs ?? 90_000,
+        taskId: evaluationId,
+        module: 'evaluation',
     };
     const evalConfig = {
         provider: evaluatorSettings.provider,
@@ -27,6 +29,8 @@ async function runEvaluation(db, evaluationId) {
         apiKey: evaluatorSettings.apiKey,
         model: evaluatorSettings.model,
         timeoutMs: evaluatorSettings.timeoutMs ?? 120_000,
+        taskId: evaluationId,
+        module: 'evaluation',
     };
     const prompts = await db.all(evaluation.collectionId
         ? (evaluation.totalCount === -1
@@ -51,7 +55,7 @@ async function runEvaluation(db, evaluationId) {
             let modelOutput;
             let modelError = null;
             try {
-                modelOutput = await chatCompletion(targetConfig, [{ role: 'user', content: p.prompt }]);
+                modelOutput = (await chatCompletion(targetConfig, [{ role: 'user', content: p.prompt }])).content;
             }
             catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
@@ -144,10 +148,11 @@ async function scoreWithEvaluator(config, systemPrompt, input) {
         ...input,
         modelOutput: shrinkText(input.modelOutput, 6_000),
     }, null, 2);
-    const raw = await chatCompletion(config, [
+    const result = await chatCompletion(config, [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: user },
     ]);
+    const raw = result.content;
     const m = raw.match(/(?<!\d\.)[01](?!\.)/);
     const score = m?.[0] === '1' ? 1 : 0;
     return { score, raw };

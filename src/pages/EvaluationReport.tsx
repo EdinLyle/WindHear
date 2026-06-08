@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { getEvaluationReport, getEvaluationReportUrl } from '../api'
 import type { EvaluationReport as Report } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
+import TokenReceiptModal from '../components/TokenReceiptModal'
 
 
 
@@ -14,6 +15,7 @@ export function EvaluationReport() {
   const [data, setData] = useState<Report | null>(null)
   const [error, setError] = useState('')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -119,6 +121,9 @@ export function EvaluationReport() {
           <div className="row">
             {!shouldPoll && (
               <>
+                <button className="btn secondary" type="button" onClick={() => setShowReceiptModal(true)}>
+                  查看 Token 小票
+                </button>
                 <button className="btn secondary" type="button" onClick={onExport} disabled={!data}>
                   导出HTML
                 </button>
@@ -328,6 +333,13 @@ export function EvaluationReport() {
           <div className="muted">暂无明细</div>
         )}
       </section>
+
+      <TokenReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        taskId={id || ''}
+        module="evaluation"
+      />
     </div>
   )
 }

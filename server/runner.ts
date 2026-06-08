@@ -43,6 +43,8 @@ async function runEvaluation(db: Db, evaluationId: string) {
     apiKey: evaluation.targetApiKey ?? undefined,
     model: evaluation.targetModel ?? undefined,
     timeoutMs: evaluation.targetTimeoutMs ?? 90_000,
+    taskId: evaluationId,
+    module: 'evaluation',
   }
   const evalConfig: ModelConfig = {
     provider: evaluatorSettings.provider,
@@ -50,6 +52,8 @@ async function runEvaluation(db: Db, evaluationId: string) {
     apiKey: evaluatorSettings.apiKey,
     model: evaluatorSettings.model,
     timeoutMs: evaluatorSettings.timeoutMs ?? 120_000,
+    taskId: evaluationId,
+    module: 'evaluation',
   }
 
   const prompts = await db.all<Array<{ id: string; prompt: string; riskType: string; riskSubType: string | null }>>(
@@ -81,7 +85,7 @@ async function runEvaluation(db: Db, evaluationId: string) {
       let modelOutput: string
       let modelError: string | null = null
       try {
-        modelOutput = await chatCompletion(targetConfig, [{ role: 'user', content: p.prompt }])
+        modelOutput = (await chatCompletion(targetConfig, [{ role: 'user', content: p.prompt }])).content
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         modelError = `被测模型请求失败: ${msg}`.slice(0, 1000)
@@ -194,10 +198,11 @@ async function scoreWithEvaluator(
     null,
     2,
   )
-  const raw = await chatCompletion(config, [
+  const result = await chatCompletion(config, [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: user },
   ])
+  const raw = result.content
 
   const m = raw.match(/(?<!\d\.)[01](?!\.)/)
   const score: 0 | 1 = m?.[0] === '1' ? 1 : 0

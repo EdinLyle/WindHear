@@ -19,6 +19,8 @@ import type {
   SkillsAuditListItem,
   SkillsAuditDetail,
   SkillsAuditItem,
+  TokenReceiptData,
+  PricingModel,
 } from './types'
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -476,4 +478,26 @@ export function getSkillsAuditReport(id: number, format: 'html' | 'md' | 'pdf' =
 
 export function deleteSkillsAudit(id: number) {
   return apiFetch<{ ok: true }>(`/api/skills-audit/${id}`, { method: 'DELETE' })
+}
+
+// ===== Token Receipt API =====
+
+interface ReceiptResponse {
+  receipts: TokenReceiptData[]
+  totalCost: unknown
+  totalTokens: number
+}
+
+export async function fetchTokenReceipt(taskId: string): Promise<TokenReceiptData[]> {
+  const resp = await apiFetch<ReceiptResponse>(`/api/receipt/${taskId}`)
+  return resp.receipts ?? []
+}
+
+export async function fetchSessionReceipt(taskId: string, sessionId: string): Promise<TokenReceiptData[]> {
+  const resp = await apiFetch<ReceiptResponse>(`/api/receipt/${taskId}/session?sessionId=${encodeURIComponent(sessionId)}`)
+  return resp.receipts ?? []
+}
+
+export async function fetchPricingModels(): Promise<PricingModel[]> {
+  return apiFetch<PricingModel[]>('/api/pricing/models')
 }
