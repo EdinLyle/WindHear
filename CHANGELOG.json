@@ -1,28 +1,14 @@
 [
   {
-    "version": "V1.6.1",
+    "version": "V1.6.0",
     "date": "2026-06-07",
     "changes": [
-      { "type": "new", "text": "新增 实时审计监控运行中任务实时显示发现的问题（pipeline各阶段增量写入findings到DB）" },
-      { "type": "fix", "text": "修复 实时监控同类任务展开互不阻塞（taskId改为模块前缀+ID复合键，消除React key冲突）" },
-      { "type": "new", "text": "新增 任务暂停/恢复功能（代码审计/Skills审计/MCP扫描支持暂停、恢复、断点续传）" },
-      { "type": "new", "text": "新增 task_checkpoints表存储任务断点数据，支持异常中断后恢复到断点位置继续执行" },
-      { "type": "new", "text": "新增 实时监控TaskCard暂停/恢复操作按钮，paused状态独立样式展示" },
-      { "type": "improve", "text": "优化 代码审计findings增量写入（Hunter/Validator阶段实时写入，去重改为DB层面执行）" },
-      { "type": "improve", "text": "优化 Skills审计Agent完成后实时写入findings，aggregating阶段改为DB层面去重" },
-      { "type": "improve", "text": "优化 MCP扫描AI审计/可利用性复核阶段增量写入findings" },
-      { "type": "fix", "text": "修复 PDF报告封面原始文件显示'-'（全链路传递originalFilename从前端到DB到PDF）" }
-    ]
-  },
-  {
-    "version": "V1.5.9",
-    "date": "2026-06-06",
-    "changes": [
+      { "type": "fix", "text": "修复 PDF报告空白页问题（drawFooter/drawHeader临时调整page.margins.bottom阻止LineWrapper自动换页，4种PDF导出均修复）" },
+      { "type": "improve", "text": "优化 四种评估HTML导出统一亮色精致UI（grid kv卡片+表格+footer），对齐前端基准样式" },
+      { "type": "improve", "text": "优化 导出报告文件名统一为 {项目名}-{创建时间}.{ext} 格式，新增buildReportFilename通用函数" },
+      { "type": "fix", "text": "修复 Skills审计HTML报告完成时间显示（传入audit参数用completed_at）+ 增加证据和漏洞代码列" },
       { "type": "fix", "text": "修复 模型设置systemPrompt为空时保存报错（Zod schema改为nullable兼容null值）" },
-      { "type": "fix", "text": "修复 实时审计监控任务完成后消失（aggregateData移除isRunning条件，返回所有状态任务）" },
-      { "type": "fix", "text": "修复 实时审计监控评估任务不显示findings（查询evaluation_items中evaluatorScore=1记录）" },
-      { "type": "fix", "text": "修复 实时监控tab选项卡筛选不生效（添加moduleId有效性验证+后端字段映射taskName→name, stage→progressStage）" },
-      { "type": "improve", "text": "优化 实时监控分区展示运行中和已完成任务" }
+      { "type": "refactor", "text": "清理 ESLint未使用参数（_regFont/_tnr）" }
     ]
   },
   {
@@ -73,11 +59,8 @@
     "version": "V1.5.4",
     "date": "2026-05-30",
     "changes": [
-      { "type": "improve", "text": "优化 导出文件名从基于ID改为基于任务名称（MD/HTML/PDF四种报告类型），新增sanitizeFilename辅助函数" },
+      { "type": "improve", "text": "优化 导出文件名从基于ID改为基于任务名称（MD/HTML/PDF四种报告类型）" },
       { "type": "refactor", "text": "重构 创建server/pdfCommon.ts公共模块，4个PDF报告生成器统一使用公共模块" },
-      { "type": "new", "text": "新增 实时监控SSE功能（auditMonitor.ts SSE连接管理与数据聚合，4个pipeline集成broadcastUpdate()）" },
-      { "type": "new", "text": "新增 后端SSE端点和轮询端点" },
-      { "type": "new", "text": "新增 前端实时监控组件和路由，导航菜单集成" },
       { "type": "refactor", "text": "重构 ModelSettings页面分拆为四个选项卡（模型评估/MCP评估/代码审计/Skills审计独立配置）" }
     ]
   },
