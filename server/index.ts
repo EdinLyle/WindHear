@@ -1828,176 +1828,134 @@ function generateHtmlReport(data: {
   severityCount: Record<string, number>; cweCount: Record<string, number>
   items: any[]; logs: any[]; createdAt: number; completedAt: number
 }): string {
-  const severityColors: Record<string, string> = {
-    critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#6b7280'
-  }
   const severityLabels: Record<string, string> = {
     critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息'
   }
 
-  // 严重度分组
-  const grouped: Record<string, any[]> = { critical: [], high: [], medium: [], low: [], info: [] }
-  for (const item of data.items) {
-    const sev = item.severity || 'info'
-    if (grouped[sev]) grouped[sev].push(item)
+  const scorePercent = Math.min(data.riskScore || 0, 100)
+  const scoreColor = scorePercent >= 70 ? '#b42318' : scorePercent >= 40 ? '#ca8a04' : scorePercent >= 20 ? '#ca8a04' : '#0a7f47'
+
+  const getSeverityClass = (sev: string) => {
+    if (sev === 'critical' || sev === 'high') return 'bad'
+    if (sev === 'medium') return 'warn'
+    if (sev === 'low' || sev === 'info') return 'ok'
+    return ''
   }
 
-  // SVG 评分环
-  const scorePercent = Math.min(data.riskScore || 0, 100)
-  const circumference = 2 * Math.PI * 45
-  const offset = circumference - (scorePercent / 100) * circumference
-  const scoreColor = scorePercent >= 70 ? '#ef4444' : scorePercent >= 40 ? '#f97316'
-    : scorePercent >= 20 ? '#eab308' : '#22c55e'
+  const getRiskLevel = (score: number) => {
+    if (score >= 70) return '严重'
+    if (score >= 40) return '高危'
+    if (score >= 20) return '中危'
+    return '低危'
+  }
 
-  // 严重度分布条
-  const barSegments = ['critical','high','medium','low','info']
-    .filter(s => data.severityCount[s] > 0)
-    .map(s => `<div style="flex:${data.severityCount[s]};background:${severityColors[s]};height:8px;border-radius:2px;" title="${severityLabels[s]}: ${data.severityCount[s]}"></div>`)
-    .join('')
+  const distText = (['critical','high','medium','low','info'] as const)
+    .map(s => `${severityLabels[s]}：${data.severityCount[s] || 0}`)
+    .join(' | ')
 
-  const barLegend = ['critical','high','medium','low','info']
-    .filter(s => data.severityCount[s] > 0)
-    .map(s => `<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${severityColors[s]};margin-right:4px;"></span>${severityLabels[s]} ${data.severityCount[s]}</span>`)
-    .join('')
+  // 漏洞表格行
+  const vulnRows = data.items.map((item, idx) => {
+    const sev = item.severity || 'info'
+    const hasExpand = !!(item.vulnerable_code || item.fix_code || item.poc_code || item.poc_description || item.reproduce_steps || item.fix_suggestion)
+    const expandId = `vuln-${idx}`
+    return `<tr>
+  <td class="c">${idx + 1}</td>
+  <td class="c ${getSeverityClass(sev)}">${escapeHtml(severityLabels[sev] || sev)}</td>
+  <td class="c">${escapeHtml(item.cwe_id || '-')}</td>
+  <td>${escapeHtml(item.file_path || '')}${item.line_start ? `<span style="color:#666">:${item.line_start}</span>` : ''}</td>
+  <td>${escapeHtml(item.title || '')}</td>
+  <td><pre>${escapeHtml(item.description || '')}</pre></td>
+</tr>
+${hasExpand ? `<tr><td colspan="8" style="padding:0">
+  <div style="padding:6px 10px"><a class="toggle" onclick="document.getElementById('${expandId}').style.display=document.getElementById('${expandId}').style.display==='none'?'block':'none'">展开详情</a></div>
+  <div id="${expandId}" style="display:none;padding:0 10px 10px">
+    ${item.vulnerable_code ? `<div style="margin-bottom:10px"><div class="detail-label">漏洞代码</div><pre class="code-block">${escapeHtml(item.vulnerable_code)}</pre></div>` : ''}
+    ${item.fix_code ? `<div style="margin-bottom:10px"><div class="detail-label">修复代码</div><pre class="code-block">${escapeHtml(item.fix_code)}</pre></div>` : ''}
+    ${item.poc_description || item.poc_code ? `<div style="margin-bottom:10px"><div class="detail-label">概念验证(PoC)</div>${item.poc_description ? `<p style="font-size:12px;color:#444;margin:0 0 4px">${escapeHtml(item.poc_description)}</p>` : ''}${item.poc_code ? `<pre class="code-block">${escapeHtml(item.poc_code)}</pre>` : ''}</div>` : ''}
+    ${item.reproduce_steps ? `<div style="margin-bottom:10px"><div class="detail-label">复现步骤</div><div style="font-size:12px;color:#444;white-space:pre-line">${escapeHtml(item.reproduce_steps)}</div></div>` : ''}
+    ${item.fix_suggestion && !item.fix_code ? `<div style="margin-bottom:10px"><div class="detail-label">修复建议</div><p style="font-size:12px;color:#444;margin:0">${escapeHtml(item.fix_suggestion)}</p></div>` : ''}
+  </div>
+</td></tr>` : ''}`
+  }).join('\n')
 
-  // 漏洞卡片
-  const vulnCards = Object.entries(grouped)
-    .filter(([_sev, items]) => items.length > 0)
-    .map(([severity, items]) => {
-      const cards = (items as any[]).map((item) => {
-        const hasPoc = !!(item.poc_code || item.poc_description)
-        const hasFix = !!item.fix_code
-        const tags: string[] = []
-        if (item.status === 'confirmed') tags.push('已验证')
-        if (hasPoc) tags.push('含PoC')
-        if (hasFix) tags.push('含修复代码')
+  const title = escapeHtml(data.name || '代码安全审计报告')
+  const createdAt = data.createdAt ? new Date(data.createdAt).toLocaleString('zh-CN') : '-'
 
-        const tagsHtml = tags.map(t =>
-          `<span style="display:inline-block;padding:2px 8px;border-radius:3px;color:#94a3b8;background:#334155;font-size:11px;margin-left:6px;">${t}</span>`
-        ).join('')
-
-        const descHtml = item.description
-          ? `<p style="color:#cbd5e1;font-size:14px;margin-bottom:16px;line-height:1.6;">${escapeHtml(item.description)}</p>` : ''
-
-        const vulnCodeHtml = item.vulnerable_code ? `
-          <div style="margin-bottom:16px;">
-            <div style="color:#f97316;font-size:13px;font-weight:600;margin-bottom:6px;">⚠ 漏洞代码</div>
-            <pre style="background:#0f172a;border-radius:6px;padding:14px;color:#e2e8f0;font-size:13px;overflow-x:auto;border:1px solid #334155;margin:0;"><code>${escapeHtml(item.vulnerable_code)}</code></pre>
-          </div>` : ''
-
-        const fixCodeHtml = item.fix_code ? `
-          <div style="margin-bottom:16px;">
-            <div style="color:#22c55e;font-size:13px;font-weight:600;margin-bottom:6px;">✓ 参考修复代码</div>
-            <pre style="background:#0f172a;border-radius:6px;padding:14px;color:#e2e8f0;font-size:13px;overflow-x:auto;border:1px solid #334155;margin:0;"><code>${escapeHtml(item.fix_code)}</code></pre>
-          </div>` : ''
-
-        const pocHtml = (item.poc_description || item.poc_code) ? `
-          <div style="margin-bottom:16px;">
-            <div style="color:#3b82f6;font-size:13px;font-weight:600;margin-bottom:6px;">🔑 概念验证(PoC)</div>
-            ${item.poc_description ? `<p style="color:#cbd5e1;font-size:13px;margin-bottom:8px;">${escapeHtml(item.poc_description)}</p>` : ''}
-            ${item.poc_code ? `<pre style="background:#0f172a;border-radius:6px;padding:14px;color:#e2e8f0;font-size:13px;overflow-x:auto;border:1px solid #334155;margin:0;"><code>${escapeHtml(item.poc_code)}</code></pre>` : ''}
-          </div>` : ''
-
-        const stepsHtml = item.reproduce_steps ? `
-          <div style="margin-bottom:8px;">
-            <div style="color:#a78bfa;font-size:13px;font-weight:600;margin-bottom:6px;">📋 复现步骤</div>
-            <div style="color:#cbd5e1;font-size:13px;line-height:1.8;white-space:pre-line;">${escapeHtml(item.reproduce_steps)}</div>
-          </div>` : ''
-
-        const fixSuggestionHtml = (item.fix_suggestion && !item.fix_code) ? `
-          <div style="margin-bottom:8px;">
-            <div style="color:#22c55e;font-size:13px;font-weight:600;margin-bottom:6px;">💡 修复建议</div>
-            <p style="color:#cbd5e1;font-size:13px;">${escapeHtml(item.fix_suggestion)}</p>
-          </div>` : ''
-
-        return `
-        <div style="background:#1e293b;border-radius:8px;padding:20px;margin-bottom:16px;border-left:4px solid ${severityColors[severity]};">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <div>
-              <span style="display:inline-block;padding:2px 10px;border-radius:4px;color:#fff;background:${severityColors[severity]};font-size:12px;font-weight:600;">${severityLabels[severity]}</span>
-              <span style="color:#f1f5f9;font-size:16px;font-weight:600;margin-left:12px;">${escapeHtml(item.title)}</span>
-            </div>
-            <div>${tagsHtml}</div>
-          </div>
-          <div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">
-            ${item.cwe_id ? `<span style="margin-right:16px;">CWE: ${escapeHtml(item.cwe_id)}</span>` : ''}
-            <span>文件: ${escapeHtml(item.file_path)}:${item.line_start || '-'}</span>
-          </div>
-          ${descHtml}${vulnCodeHtml}${fixCodeHtml}${pocHtml}${stepsHtml}${fixSuggestionHtml}
-        </div>`
-      }).join('')
-
-      return `<h2 style="color:${severityColors[severity]};font-size:18px;margin:24px 0 12px;">${severityLabels[severity]} (${(items as any[]).length})</h2>${cards}`
-    }).join('')
-
-  return `<!DOCTYPE html>
+  return `<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>代码安全审计报告 - ${escapeHtml(data.name)}</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0f172a; color:#f1f5f9; max-width:1200px; margin:0 auto; padding:32px; }
-h1 { font-size:28px; color:#f1f5f9; }
-h2 { font-size:18px; }
-pre { margin: 0; }
-code { font-family: 'Courier New', monospace; }
-@media print {
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .no-print { display: none !important; }
-  body { padding: 16px; }
-  pre { page-break-inside: avoid; }
-}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>代码安全审计报告 - ${title}</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; color: #111; margin: 0; background: #fff; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 22px 40px; }
+    h1 { font-size: 20px; margin: 0 0 14px; }
+    h2 { font-size: 14px; margin: 22px 0 10px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+    .kv { border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; }
+    .k { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .v { font-size: 13px; color: #111; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #e6e6e6; }
+    th, td { border-bottom: 1px solid #eee; padding: 9px 10px; vertical-align: top; font-size: 12px; }
+    th { background: #fafafa; text-align: left; font-weight: 600; color: #222; }
+    tr:last-child td { border-bottom: 0; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: 12px; line-height: 1.55; }
+    .code-block { background: #f6f8fa; border: 1px solid #e6e6e6; border-radius: 6px; padding: 10px 12px; color: #333; }
+    .detail-label { font-size: 12px; font-weight: 600; color: #444; margin-bottom: 4px; }
+    .c { text-align: center; white-space: nowrap; }
+    .ok { color: #0a7f47; font-weight: 600; }
+    .bad { color: #b42318; font-weight: 600; }
+    .warn { color: #ca8a04; font-weight: 600; }
+    .info { color: #3b82f6; font-weight: 600; }
+    .toggle { color: #3b82f6; cursor: pointer; font-size: 12px; text-decoration: none; }
+    .toggle:hover { text-decoration: underline; }
+    .footer { margin-top: 26px; padding-top: 14px; border-top: 1px solid #eee; color: #666; font-size: 12px; display: flex; justify-content: space-between; }
+  </style>
 </head>
 <body>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #334155;">
-    <div>
-      <h1>智能漏洞挖掘审计报告</h1>
-      <p style="color:#94a3b8;font-size:14px;margin-top:8px;">${escapeHtml(data.name)} | ${escapeHtml(data.language || 'Unknown')}</p>
-    </div>
-    <div style="text-align:right;color:#94a3b8;font-size:13px;">
-      <p>报告生成时间</p>
-      <p style="color:#f1f5f9;">${new Date().toLocaleString('zh-CN')}</p>
-    </div>
-  </div>
+  <div class="page">
+    <h1>智能漏洞挖掘审计报告</h1>
 
-  <div style="display:grid;grid-template-columns:auto repeat(3,1fr);gap:20px;margin-bottom:32px;">
-    <div style="background:#1e293b;border-radius:12px;padding:20px;text-align:center;">
-      <svg width="100" height="100" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="#334155" stroke-width="8"/>
-        <circle cx="50" cy="50" r="45" fill="none" stroke="${scoreColor}" stroke-width="8"
-          stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
-          stroke-linecap="round" transform="rotate(-90 50 50)"/>
-        <text x="50" y="50" text-anchor="middle" dy="6" fill="${scoreColor}" font-size="24" font-weight="700">${scorePercent}</text>
-      </svg>
-      <div style="color:#94a3b8;font-size:12px;margin-top:4px;">风险评分</div>
+    <h2>基本信息</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">项目名称</div><div class="v">${title}</div></div>
+      <div class="kv"><div class="k">完成时间</div><div class="v">${escapeHtml(createdAt)}</div></div>
+      <div class="kv"><div class="k">语言</div><div class="v">${escapeHtml(data.language || '-')}</div></div>
+      <div class="kv"><div class="k">文件数</div><div class="v">${escapeHtml(String(data.totalFiles))}</div></div>
+      <div class="kv"><div class="k">代码切片数</div><div class="v">${escapeHtml(String(data.totalSlices))}</div></div>
     </div>
-    <div style="background:#1e293b;border-radius:12px;padding:20px;text-align:center;">
-      <div style="font-size:32px;font-weight:700;color:#f1f5f9;">${data.findingsCount}</div>
-      <div style="color:#94a3b8;font-size:13px;margin-top:4px;">漏洞总数</div>
-    </div>
-    <div style="background:#1e293b;border-radius:12px;padding:20px;text-align:center;">
-      <div style="font-size:32px;font-weight:700;color:#ef4444;">${data.severityCount.critical}</div>
-      <div style="color:#94a3b8;font-size:13px;margin-top:4px;">严重漏洞</div>
-    </div>
-    <div style="background:#1e293b;border-radius:12px;padding:20px;text-align:center;">
-      <div style="font-size:32px;font-weight:700;color:#f97316;">${data.severityCount.high}</div>
-      <div style="color:#94a3b8;font-size:13px;margin-top:4px;">高危漏洞</div>
-    </div>
-  </div>
 
-  <div style="margin-bottom:32px;">
-    <div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">严重度分布</div>
-    <div style="display:flex;gap:4px;border-radius:4px;overflow:hidden;">${barSegments}</div>
-    <div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:#94a3b8;">${barLegend}</div>
-  </div>
+    <h2>评估结果</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">风险评分</div><div class="v" style="color:${scoreColor};font-weight:600">${scorePercent}</div></div>
+      <div class="kv"><div class="k">风险等级</div><div class="v" style="color:${scoreColor};font-weight:600">${escapeHtml(getRiskLevel(scorePercent))}</div></div>
+      <div class="kv"><div class="k">发现项数</div><div class="v">${data.findingsCount} 项</div></div>
+      <div class="kv"><div class="k">问题分布</div><div class="v">${escapeHtml(distText)}</div></div>
+    </div>
 
-  ${vulnCards}
+    <h2>漏洞详情</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:50px" class="c">序号</th>
+          <th style="width:70px" class="c">等级</th>
+          <th style="width:80px" class="c">CWE</th>
+          <th style="width:160px">文件</th>
+          <th style="width:200px">标题</th>
+          <th>描述</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${vulnRows || '<tr><td colspan="8" class="c">未发现漏洞</td></tr>'}
+      </tbody>
+    </table>
 
-  <div style="margin-top:48px;padding-top:24px;border-top:1px solid #334155;color:#64748b;font-size:12px;text-align:center;">
-     | 报告生成时间: ${new Date().toLocaleString('zh-CN')}
+    <div class="footer">
+      <div>听风</div>
+      <div>0x八月</div>
+    </div>
   </div>
 </body>
 </html>`
@@ -2343,7 +2301,7 @@ app.get('/api/skills-audit/:id/report', async (req, res) => {
     res.send(r.markdown)
   } else if (format === 'html') {
     const audit = await skillsAuditStore.getAudit(auditId) as any
-    const html = generateSkillsAuditHtml(r)
+    const html = generateSkillsAuditHtml(r, audit)
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.setHeader('Content-Disposition', contentDisposition(buildReportFilename(audit?.name, audit?.created_at, 'html', 'skills-audit')))
     res.send(html)
@@ -2358,48 +2316,115 @@ app.delete('/api/skills-audit/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
-function generateSkillsAuditHtml(data: any): string {
+function generateSkillsAuditHtml(data: any, audit: any): string {
   const projectInfo = JSON.parse(data.project_info || '{}')
   const findings = JSON.parse(data.findings || '[]')
-  const severityColors: Record<string, string> = {
-    critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#6b7280'
-  }
   const severityLabels: Record<string, string> = {
     critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息'
   }
 
   const scorePercent = Math.min(data.score_total || 0, 100)
-  const scoreColor = scorePercent >= 70 ? '#ef4444' : scorePercent >= 40 ? '#f97316' : scorePercent >= 20 ? '#eab308' : '#22c55e'
+  const scoreColor = scorePercent >= 70 ? '#b42318' : scorePercent >= 40 ? '#ca8a04' : scorePercent >= 20 ? '#ca8a04' : '#0a7f47'
 
-  const findingsHtml = findings.map((f: any) => `
-    <div style="border-left:4px solid ${severityColors[f.severity] || '#6b7280'};padding:12px 16px;margin:8px 0;background:#f9fafb;border-radius:4px;">
-      <div style="font-weight:600;color:${severityColors[f.severity] || '#6b7280'}">[${f.severity?.toUpperCase()}] ${f.title}</div>
-      <div style="font-size:13px;color:#6b7280;margin:4px 0">${f.filePath}${f.lineStart ? ':' + f.lineStart : ''} | ${f.riskCategory}</div>
-      <div style="font-size:14px;margin:4px 0">${f.description || ''}</div>
-      ${f.vulnerableCode ? `<pre style="background:#1e293b;color:#e2e8f0;padding:8px;border-radius:4px;font-size:12px;overflow-x:auto;">${escapeHtml(f.vulnerableCode)}</pre>` : ''}
-      ${f.remediation ? `<div style="font-size:13px;color:#16a34a;margin:4px 0"><b>修复建议:</b> ${f.remediation}</div>` : ''}
+  const getSeverityClass = (sev: string) => {
+    if (sev === 'critical' || sev === 'high') return 'bad'
+    if (sev === 'medium') return 'warn'
+    if (sev === 'low' || sev === 'info') return 'ok'
+    return ''
+  }
+
+  const findingsRows = findings.map((f: any, idx: number) => `<tr>
+  <td class="c">${idx + 1}</td>
+  <td class="c ${getSeverityClass(f.severity)}">${escapeHtml(severityLabels[f.severity] || f.severity)}</td>
+  <td>${escapeHtml(f.title || '')}</td>
+  <td>${escapeHtml((f.filePath || '') + (f.lineStart ? ':' + f.lineStart : ''))}</td>
+  <td><pre>${escapeHtml(f.description || '')}</pre></td>
+  <td><pre>${escapeHtml(f.evidence || '')}</pre></td>
+  <td><pre>${escapeHtml(f.vulnerableCode || '')}</pre></td>
+  <td><pre>${escapeHtml(f.remediation || '')}</pre></td>
+</tr>`).join('\n')
+
+  const title = escapeHtml(data.name || 'Skills 安全审计报告')
+  const completedAt = audit?.completed_at ? new Date(audit.completed_at).toLocaleString('zh-CN') : '-'
+  const distText = (['critical','high','medium','low','info'] as const)
+    .map(s => `${severityLabels[s]}：${findings.filter((f: any) => (f.severity || 'info') === s).length}`)
+    .join(' | ')
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title}</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; color: #111; margin: 0; background: #fff; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 22px 40px; }
+    h1 { font-size: 20px; margin: 0 0 14px; }
+    h2 { font-size: 14px; margin: 22px 0 10px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+    .kv { border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; }
+    .k { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .v { font-size: 13px; color: #111; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #e6e6e6; }
+    th, td { border-bottom: 1px solid #eee; padding: 9px 10px; vertical-align: top; font-size: 12px; }
+    th { background: #fafafa; text-align: left; font-weight: 600; color: #222; }
+    tr:last-child td { border-bottom: 0; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: 12px; line-height: 1.55; }
+    .c { text-align: center; white-space: nowrap; }
+    .ok { color: #0a7f47; font-weight: 600; }
+    .bad { color: #b42318; font-weight: 600; }
+    .warn { color: #ca8a04; font-weight: 600; }
+    .info { color: #3b82f6; font-weight: 600; }
+    .footer { margin-top: 26px; padding-top: 14px; border-top: 1px solid #eee; color: #666; font-size: 12px; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Skills 安全审计报告</h1>
+
+    <h2>基本信息</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">任务名称</div><div class="v">${title}</div></div>
+      <div class="kv"><div class="k">完成时间</div><div class="v">${escapeHtml(completedAt)}</div></div>
+      <div class="kv"><div class="k">Skills数量</div><div class="v">${escapeHtml(String(projectInfo.totalSkills ?? '-'))}</div></div>
+      <div class="kv"><div class="k">文件数量</div><div class="v">${escapeHtml(String(projectInfo.totalFiles ?? '-'))}</div></div>
     </div>
-  `).join('')
 
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Skills安全审计报告</title>
-<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:960px;margin:0 auto;padding:24px;color:#1e293b;}</style>
-</head><body>
-<h1>Skills 安全审计报告</h1>
-<div style="display:flex;gap:24px;margin:16px 0">
-  <div style="text-align:center"><div style="font-size:48px;font-weight:700;color:${scoreColor}">${scorePercent}</div><div style="color:#6b7280">风险评分</div></div>
-  <div style="flex:1">
-    <div><b>Skills数量:</b> ${projectInfo.totalSkills ?? '-'}</div>
-    <div><b>文件数量:</b> ${projectInfo.totalFiles ?? '-'}</div>
-    <div><b>发现项:</b> ${findings.length}</div>
-    <div><b>风险等级:</b> <span style="color:${scoreColor}">${data.score_risk_level}</span></div>
+    <h2>评估结果</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">风险评分</div><div class="v">${scorePercent}</div></div>
+      <div class="kv"><div class="k">风险等级</div><div class="v" style="color:${scoreColor};font-weight:600">${escapeHtml(data.score_risk_level || '-')}</div></div>
+      <div class="kv"><div class="k">发现项数</div><div class="v">${findings.length} 项</div></div>
+      <div class="kv"><div class="k">问题分布</div><div class="v">${escapeHtml(distText)}</div></div>
+    </div>
+
+    <h2>发现项详情</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:50px" class="c">序号</th>
+          <th style="width:70px" class="c">等级</th>
+          <th style="width:200px">标题</th>
+          <th style="width:160px">文件位置</th>
+          <th>描述</th>
+          <th>证据</th>
+          <th>漏洞代码</th>
+          <th>修复建议</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${findingsRows || '<tr><td colspan="8" class="c">未发现安全问题</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <div>听风</div>
+      <div>0x八月</div>
+    </div>
   </div>
-</div>
-<hr>
-<h2>发现项 (${findings.length})</h2>
-${findingsHtml}
-<div style="text-align:center;color:#94a3b8;margin-top:24px;font-size:12px">听风 Skills 安全审计 | ${new Date().toLocaleString('zh-CN')}</div>
-</body></html>`
+</body>
+</html>`
 }
 
 const port = Number(process.env.PORT ?? 3001)
@@ -2554,74 +2579,229 @@ function generateEvaluationMd(evaluation: any, items: any[]): string {
 /** 生成评估报告HTML格式 */
 function generateEvaluationHtml(evaluation: any, items: any[]): string {
   const passRate = Math.round((evaluation.passRate ?? 0) * 100)
-  const passColor = passRate >= 80 ? '#22c55e' : passRate >= 50 ? '#eab308' : '#ef4444'
-  const itemsHtml = items.map((item: any, i: number) => {
-    const score = item.evaluatorScore
-    const isPass = score != null ? score > 0 : true
-    return `<div style="border-left:4px solid ${isPass ? '#22c55e' : '#ef4444'};padding:12px 16px;margin:8px 0;background:#1e293b;border-radius:4px;">
-      <div style="font-weight:600;color:${isPass ? '#22c55e' : '#ef4444'}">${isPass ? 'PASS' : 'FAIL'} - ${item.riskType || '未知'}</div>
-      ${item.riskSubType ? `<div style="font-size:13px;color:#94a3b8">子类型: ${item.riskSubType}</div>` : ''}
-      <div style="font-size:14px;margin:8px 0"><b>输入:</b> ${escapeHtml((item.inputPrompt || '').slice(0, 300))}</div>
-      <div style="font-size:13px;color:#94a3b8"><b>输出:</b> ${escapeHtml((item.modelOutput || '').slice(0, 300))}</div>
-    </div>`
-  }).join('')
+  const standard = evaluation.standard === 'tc260' ? 'TC260测试集' : evaluation.standard === 'general' ? '通用测试集' : evaluation.standard === 'custom' ? '自定义测试集' : (evaluation.standard || '-')
+  const total = evaluation.totalCount ?? 0
+  const pass = evaluation.passCount ?? 0
+  const fail = evaluation.failCount ?? 0
+  const createdAt = evaluation.createdAt ? new Date(evaluation.createdAt).toLocaleString('zh-CN') : '-'
+  const finishedAt = evaluation.finishedAt ? new Date(evaluation.finishedAt).toLocaleString('zh-CN') : ''
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>模型安全评估报告</title>
-<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:960px;margin:0 auto;padding:24px;color:#f1f5f9;background:#0f172a;}</style>
-</head><body>
-<h1>模型安全评估报告</h1>
-<div style="display:flex;gap:24px;margin:16px 0">
-  <div style="text-align:center"><div style="font-size:48px;font-weight:700;color:${passColor}">${passRate}%</div><div style="color:#94a3b8">通过率</div></div>
-  <div style="flex:1">
-    <div><b>评估名称:</b> ${escapeHtml(evaluation.name || '')}</div>
-    <div><b>评估标准:</b> ${evaluation.standard || '-'}</div>
-    <div><b>目标模型:</b> ${evaluation.targetModel || evaluation.targetProvider || '-'}</div>
-    <div><b>总数:</b> ${evaluation.totalCount ?? 0}, <b>通过:</b> ${evaluation.passCount ?? 0}, <b>未通过:</b> ${evaluation.failCount ?? 0}</div>
+  const TRUNCATE_LEN = 200
+  const rows = items.map((it: any, idx: number) => {
+    const isError = it.evaluatorScore == null
+    const passed = !isError && it.evaluatorScore === 0
+    const result = isError ? '异常' : passed ? '通过' : '未通过'
+    const cls = isError ? 'warn' : passed ? 'ok' : 'bad'
+    const promptText = (it.inputPrompt || '').length > TRUNCATE_LEN
+      ? escapeHtml((it.inputPrompt || '').slice(0, TRUNCATE_LEN)) + '...'
+      : escapeHtml(it.inputPrompt || '')
+    const outputText = (it.modelOutput || '').length > TRUNCATE_LEN
+      ? escapeHtml((it.modelOutput || '').slice(0, TRUNCATE_LEN)) + '...'
+      : escapeHtml(it.modelOutput || '')
+    return `<tr>
+  <td class="c">${idx + 1}</td>
+  <td class="c">${escapeHtml(it.riskType || '')}</td>
+  <td><pre>${promptText}</pre></td>
+  <td><pre>${outputText}</pre></td>
+  <td class="c ${cls}">${result}</td>
+</tr>`
+  }).join('\n')
+
+  const title = escapeHtml(evaluation.name || '评估报告')
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title}</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; color: #111; margin: 0; background: #fff; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 22px 40px; }
+    h1 { font-size: 20px; margin: 0 0 14px; }
+    h2 { font-size: 14px; margin: 22px 0 10px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+    .kv { border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; }
+    .k { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .v { font-size: 13px; color: #111; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #e6e6e6; }
+    th, td { border-bottom: 1px solid #eee; padding: 9px 10px; vertical-align: top; font-size: 12px; }
+    th { background: #fafafa; text-align: left; font-weight: 600; color: #222; }
+    tr:last-child td { border-bottom: 0; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: 12px; line-height: 1.55; }
+    .c { text-align: center; white-space: nowrap; }
+    .ok { color: #0a7f47; font-weight: 600; }
+    .bad { color: #b42318; font-weight: 600; }
+    .warn { color: #ca8a04; font-weight: 600; }
+    .info { color: #3b82f6; font-weight: 600; }
+    .footer { margin-top: 26px; padding-top: 14px; border-top: 1px solid #eee; color: #666; font-size: 12px; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>LLM 模型评估报告</h1>
+
+    <h2>基本信息</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">任务名称</div><div class="v">${title}</div></div>
+      <div class="kv"><div class="k">时间</div><div class="v">${escapeHtml(createdAt)}${finishedAt ? `（完成 ${escapeHtml(finishedAt)}）` : ''}</div></div>
+      <div class="kv"><div class="k">被测模型接口</div><div class="v">${escapeHtml(evaluation.targetBaseUrl || '-')}${evaluation.targetModel ? `（model=${escapeHtml(String(evaluation.targetModel))}）` : ''}</div></div>
+      <div class="kv"><div class="k">状态</div><div class="v">${escapeHtml(evaluation.status === 'completed' ? '已完成' : evaluation.status === 'running' ? '运行中' : evaluation.status === 'failed' ? '失败' : evaluation.status)}</div></div>
+    </div>
+
+    <h2>评估结果统计</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">评估标准</div><div class="v">${escapeHtml(standard)}</div></div>
+      <div class="kv"><div class="k">评估数量</div><div class="v">${escapeHtml(String(total))}</div></div>
+      <div class="kv"><div class="k">通过率</div><div class="v">${escapeHtml(String(passRate))}%</div></div>
+      <div class="kv"><div class="k">通过/未通过</div><div class="v">${escapeHtml(`${pass}/${fail}`)}</div></div>
+    </div>
+
+    <h2>测试明细</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:60px" class="c">序号</th>
+          <th style="width:110px" class="c">风险类型</th>
+          <th>输入（prompt）</th>
+          <th>输出（被测模型）</th>
+          <th style="width:90px" class="c">结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || '<tr><td colspan="5" class="c">暂无明细</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <div>听风</div>
+      <div>0x八月</div>
+    </div>
   </div>
-</div>
-<hr style="border-color:#334155">
-<h2>评估项目 (${items.length})</h2>
-${itemsHtml}
-<div style="text-align:center;color:#94a3b8;margin-top:24px;font-size:12px">听风 模型安全评估 | ${new Date().toLocaleString('zh-CN')}</div>
-</body></html>`
+</body>
+</html>`
 }
 
 /** 生成MCP报告HTML（从报告数据） */
 function generateMcpReportHtmlFromData(r: any): string {
   const projectInfo = JSON.parse(r.project_info || '{}')
   const findings = JSON.parse(r.findings || '[]')
-  const severityColors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#6b7280' }
   const severityLabels: Record<string, string> = { critical: '严重', high: '高危', medium: '中危', low: '低危', info: '信息' }
 
   const scorePercent = Math.min(r.score_total || 0, 100)
-  const scoreColor = scorePercent >= 70 ? '#ef4444' : scorePercent >= 40 ? '#f97316' : scorePercent >= 20 ? '#eab308' : '#22c55e'
+  const scoreColor = scorePercent >= 70 ? '#b42318' : scorePercent >= 40 ? '#ca8a04' : scorePercent >= 20 ? '#ca8a04' : '#0a7f47'
 
-  const findingsHtml = findings.map((f: any) => `
-    <div style="border-left:4px solid ${severityColors[f.severity] || '#6b7280'};padding:12px 16px;margin:8px 0;background:#1e293b;border-radius:4px;">
-      <div style="font-weight:600;color:${severityColors[f.severity] || '#6b7280'}">[${(f.severity || 'info').toUpperCase()}] ${f.title}</div>
-      ${f.category ? `<div style="font-size:13px;color:#94a3b8">类别: ${f.category}</div>` : ''}
-      <div style="font-size:14px;margin:8px 0">${f.description || ''}</div>
-      ${f.impact ? `<div style="font-size:13px;color:#ef4444;margin:4px 0"><b>影响:</b> ${f.impact}</div>` : ''}
-      ${f.remediation ? `<div style="font-size:13px;color:#22c55e;margin:4px 0"><b>修复建议:</b> ${f.remediation}</div>` : ''}
+  const getSeverityClass = (sev: string) => {
+    if (sev === 'critical' || sev === 'high') return 'bad'
+    if (sev === 'medium') return 'warn'
+    if (sev === 'low' || sev === 'info') return 'ok'
+    return ''
+  }
+
+  const getStatusClass = (status: string) => {
+    if (status === 'confirmed') return 'bad'
+    if (status === 'likely') return 'warn'
+    if (status === 'needs_review') return 'info'
+    if (status === 'false_positive') return 'ok'
+    return ''
+  }
+  const getStatusLabel = (status: string) => {
+    if (status === 'confirmed') return '已确认'
+    if (status === 'likely') return '较可能'
+    if (status === 'needs_review') return '待复核'
+    if (status === 'false_positive') return '误报'
+    return status || '-'
+  }
+
+  const findingsRows = findings.map((f: any, idx: number) => `<tr>
+  <td class="c">${idx + 1}</td>
+  <td class="c ${getSeverityClass(f.severity)}">${escapeHtml(severityLabels[f.severity] || f.severity)}</td>
+  <td class="c ${getStatusClass(f.status)}">${escapeHtml(getStatusLabel(f.status))}</td>
+  <td>${escapeHtml(f.title || '')}</td>
+  <td><pre>${escapeHtml(f.description || '')}</pre></td>
+  <td><pre>${escapeHtml(f.impact || '')}</pre></td>
+  <td><pre>${escapeHtml(f.remediation || '')}</pre></td>
+</tr>`).join('\n')
+
+  const title = escapeHtml(r.name || projectInfo.rootName || 'MCP 安全评估报告')
+  const createdAt = r.created_at ? new Date(r.created_at).toLocaleString('zh-CN') : '-'
+  const distText = (['critical','high','medium','low','info'] as const)
+    .map(s => `${severityLabels[s]}：${findings.filter((f: any) => (f.severity || 'info') === s).length}`)
+    .join(' | ')
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title} - MCP 风险评估报告</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; color: #111; margin: 0; background: #fff; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 22px 40px; }
+    h1 { font-size: 20px; margin: 0 0 14px; }
+    h2 { font-size: 14px; margin: 22px 0 10px; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+    .kv { border: 1px solid #e6e6e6; border-radius: 10px; padding: 10px 12px; }
+    .k { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .v { font-size: 13px; color: #111; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #e6e6e6; }
+    th, td { border-bottom: 1px solid #eee; padding: 9px 10px; vertical-align: top; font-size: 12px; }
+    th { background: #fafafa; text-align: left; font-weight: 600; color: #222; }
+    tr:last-child td { border-bottom: 0; }
+    pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: 12px; line-height: 1.55; }
+    .c { text-align: center; white-space: nowrap; }
+    .ok { color: #0a7f47; font-weight: 600; }
+    .bad { color: #b42318; font-weight: 600; }
+    .warn { color: #ca8a04; font-weight: 600; }
+    .info { color: #3b82f6; font-weight: 600; }
+    .footer { margin-top: 26px; padding-top: 14px; border-top: 1px solid #eee; color: #666; font-size: 12px; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>MCP 风险评估报告</h1>
+
+    <h2>基本信息</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">任务名称</div><div class="v">${title}</div></div>
+      <div class="kv"><div class="k">时间</div><div class="v">${escapeHtml(createdAt)}</div></div>
+      <div class="kv"><div class="k">项目语言</div><div class="v">${escapeHtml((projectInfo.languages || []).join(', ') || '-')}</div></div>
+      <div class="kv"><div class="k">文件统计</div><div class="v">${escapeHtml(String(projectInfo.totalFiles ?? '-'))} 个文件</div></div>
     </div>
-  `).join('')
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>MCP安全评估报告</title>
-<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:960px;margin:0 auto;padding:24px;color:#f1f5f9;background:#0f172a;}</style>
-</head><body>
-<h1>MCP 安全评估报告</h1>
-<div style="display:flex;gap:24px;margin:16px 0">
-  <div style="text-align:center"><div style="font-size:48px;font-weight:700;color:${scoreColor}">${scorePercent}</div><div style="color:#94a3b8">风险评分</div></div>
-  <div style="flex:1">
-    <div><b>项目:</b> ${projectInfo.rootName || '-'}</div>
-    <div><b>语言:</b> ${(projectInfo.languages || []).join(', ') || '-'}</div>
-    <div><b>发现项:</b> ${findings.length}</div>
-    <div><b>风险等级:</b> <span style="color:${scoreColor}">${r.score_risk_level || '-'}</span></div>
+    <h2>评估结果</h2>
+    <div class="meta">
+      <div class="kv"><div class="k">风险评分</div><div class="v" style="color:${scoreColor};font-weight:600">${scorePercent}</div></div>
+      <div class="kv"><div class="k">风险等级</div><div class="v">${escapeHtml(findings.length === 0 ? '安全' : (severityLabels[r.score_risk_level] || r.score_risk_level || '-'))}</div></div>
+      <div class="kv"><div class="k">发现问题</div><div class="v">${findings.length} 项</div></div>
+      <div class="kv"><div class="k">问题分布</div><div class="v">${escapeHtml(distText)}</div></div>
+    </div>
+
+    <h2>漏洞详情</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:50px" class="c">序号</th>
+          <th style="width:70px" class="c">等级</th>
+          <th style="width:70px" class="c">状态</th>
+          <th style="width:200px">标题</th>
+          <th>描述</th>
+          <th>影响</th>
+          <th>修复建议</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${findingsRows || '<tr><td colspan="7" class="c">未发现安全问题</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <div>听风</div>
+      <div>0x八月</div>
+    </div>
   </div>
-</div>
-<hr style="border-color:#334155">
-<h2>发现项 (${findings.length})</h2>
-${findingsHtml}
-<div style="text-align:center;color:#94a3b8;margin-top:24px;font-size:12px">听风 MCP 安全评估 | ${new Date().toLocaleString('zh-CN')}</div>
-</body></html>`
+</body>
+</html>`
 }
