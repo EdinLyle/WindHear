@@ -3,7 +3,7 @@ import type { Response } from 'express'
 import {
   LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
-  drawH1, drawSeverityTag,
+  drawH1, drawSeverityTag, drawBodyText,
   drawTable,
   ensureSpace, postProcessPages,
   FONT_SIZES,
@@ -184,8 +184,7 @@ function drawDetailPages(
     if (item.riskSubType) {
       doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.textSecondary)
         .text('子类型:', PAGE.MARGIN_LEFT)
-      doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.text)
-        .text(item.riskSubType, PAGE.MARGIN_LEFT)
+      drawBodyText(doc, item.riskSubType, { x: PAGE.MARGIN_LEFT, font: songFont })
       doc.moveDown(0.2)
     }
 
@@ -213,8 +212,7 @@ function drawDetailPages(
     if (promptText) {
       doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.textSecondary)
         .text('输入:', PAGE.MARGIN_LEFT)
-      doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-        .text(promptText, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+      drawBodyText(doc, promptText, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
       doc.moveDown(0.3)
     }
 
@@ -225,8 +223,7 @@ function drawDetailPages(
     if (outputText) {
       doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.textSecondary)
         .text('输出:', PAGE.MARGIN_LEFT)
-      doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-        .text(outputText, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+      drawBodyText(doc, outputText, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
       doc.moveDown(0.3)
     }
 

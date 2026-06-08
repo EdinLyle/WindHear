@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawSeverityTag, drawTable, ensureSpace, postProcessPages, FONT_SIZES, } from '../pdfCommon.js';
+import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawSeverityTag, drawBodyText, drawTable, ensureSpace, postProcessPages, FONT_SIZES, } from '../pdfCommon.js';
 // 评估状态中文映射
 const EVAL_STATUS_ZH = {
     completed: '已完成',
@@ -132,8 +132,7 @@ function drawDetailPages(doc, items, regFont, aeroFont, songFont, fangFont, tnrF
         if (item.riskSubType) {
             doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.textSecondary)
                 .text('子类型:', PAGE.MARGIN_LEFT);
-            doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.text)
-                .text(item.riskSubType, PAGE.MARGIN_LEFT);
+            drawBodyText(doc, item.riskSubType, { x: PAGE.MARGIN_LEFT, font: songFont });
             doc.moveDown(0.2);
         }
         // 评估结果 — 三级标题（四号 方正风雅宋），内容直接跟在冒号后
@@ -158,8 +157,7 @@ function drawDetailPages(doc, items, regFont, aeroFont, songFont, fangFont, tnrF
         if (promptText) {
             doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.textSecondary)
                 .text('输入:', PAGE.MARGIN_LEFT);
-            doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-                .text(promptText, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+            drawBodyText(doc, promptText, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
             doc.moveDown(0.3);
         }
         // 输出 — 三级标题，内容平铺
@@ -169,8 +167,7 @@ function drawDetailPages(doc, items, regFont, aeroFont, songFont, fangFont, tnrF
         if (outputText) {
             doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.textSecondary)
                 .text('输出:', PAGE.MARGIN_LEFT);
-            doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-                .text(outputText, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+            drawBodyText(doc, outputText, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
             doc.moveDown(0.3);
         }
         // 分隔线

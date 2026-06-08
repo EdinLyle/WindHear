@@ -592,6 +592,127 @@ export function drawSeverityBar(doc: PDFDoc, severityCount: Record<string, numbe
      .text(legendParts.join('   |   '), startX, doc.y, { width: barW, align: 'center' });
 }
 
+// ========== 正文绘制（智能缩进） ==========
+// 规则：
+// 1. 纯叙述段落 → 首行缩进2个中文字符（\u3000\u3000）
+// 2. 编号列表项（如 1.xxx、2.xxx、①xxx） → 不缩进，每项一行
+// 3. 挤在一起的编号列表（如 "1.xxx,2.xxx,3.xxx" 或 "1.xxx 2.xxx 3.xxx"） → 拆分为多行，每项不缩进
+// 4. 混合格式（叙述+编号） → 叙述缩进，编号不缩进
+
+const INDENT_PREFIX = '\u3000\u3000';
+
+/**
+ * 将文本拆分为逻辑段落，每段标注是否为编号行
+ *
+ * 核心思路：先将文本合并为单行（去除换行），再用全局正则扫描所有编号位置，
+ * 根据编号位置将文本拆分为编号项和非编号叙述段。
+ */
+function parseBodySegments(text: string): Array<{ content: string; isNumbered: boolean }> {
+  // 先按空行分段（空行表示自然段落分隔）
+  const paragraphs = text.split(/\n\s*\n/);
+  const segments: Array<{ content: string; isNumbered: boolean }> = [];
+
+  for (const para of paragraphs) {
+    // 合并段落内所有换行为空格（处理PDFKit换行导致的断裂）
+    const merged = para.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!merged) continue;
+
+    // 数字编号模式：数字 + [.、）] + 可选空格
+    // 前导：行首 / 空格 / 逗号 / 分号 / 句号 / 中文标点（：；，。）
+    const numRe = /(?:^|[\s,;，；。：:])((\d+)[.、）]\s?)/g;
+    const positions: Array<{ index: number; matchLen: number }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = numRe.exec(merged)) !== null) {
+      const prefixLen = m[0].length - m[1].length;
+      positions.push({ index: m.index + prefixLen, matchLen: m[1].length });
+    }
+
+    // 圆圈数字模式：①②③ 等
+    const circleRe = /[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g;
+    let cm: RegExpExecArray | null;
+    const circlePositions: Array<{ index: number; matchLen: number }> = [];
+    while ((cm = circleRe.exec(merged)) !== null) {
+      circlePositions.push({ index: cm.index, matchLen: 1 });
+    }
+
+    // 选择编号体系：数字编号优先，圆圈数字次之
+    const useCircle = circlePositions.length >= 2 && positions.length < 2;
+    const activePositions = useCircle ? circlePositions : positions;
+
+    if (activePositions.length >= 2) {
+      // 第一个编号前面是否有叙述内容
+      const firstIdx = activePositions[0].index;
+      // 编号前的前缀：去掉前导标点（：、，等）
+      const prefix = merged.slice(0, firstIdx).replace(/[：:，,；;、\s]+$/, '').trim();
+      if (prefix) {
+        segments.push({ content: prefix, isNumbered: false });
+      }
+      for (let i = 0; i < activePositions.length; i++) {
+        const start = activePositions[i].index;
+        const end = i + 1 < activePositions.length ? activePositions[i + 1].index : merged.length;
+        let item = merged.slice(start, end).trim();
+        // 清理项尾部的分隔逗号/分号
+        item = item.replace(/[,，;；]+$/, '').trim();
+        if (item) segments.push({ content: item, isNumbered: true });
+      }
+    } else if (activePositions.length === 1) {
+      if (activePositions[0].index === 0) {
+        // 编号在行首，整段视为编号项
+        segments.push({ content: merged, isNumbered: true });
+      } else {
+        // 编号不在行首，前面有叙述内容
+        const prefix = merged.slice(0, activePositions[0].index).replace(/[：:，,；;、\s]+$/, '').trim();
+        const suffix = merged.slice(activePositions[0].index).trim();
+        if (prefix) segments.push({ content: prefix, isNumbered: false });
+        if (suffix) segments.push({ content: suffix, isNumbered: true });
+      }
+    } else {
+      // 无编号，纯叙述段落，缩进
+      segments.push({ content: merged, isNumbered: false });
+    }
+  }
+
+  return segments;
+}
+
+export function drawBodyText(
+  doc: PDFDoc,
+  text: string,
+  opts: {
+    font?: string;
+    fontSize?: number;
+    color?: string;
+    x?: number;
+    width?: number;
+    indent?: boolean; // 是否首行缩进，默认true（传false强制不缩进）
+  }
+): void {
+  const font = opts.font ?? 'SongTi';
+  const fontSize = opts.fontSize ?? FONT_SIZES.body;
+  const color = opts.color ?? LIGHT_COLORS.descText;
+  const x = opts.x ?? PAGE.MARGIN_LEFT;
+  const width = opts.width ?? PAGE.CONTENT_WIDTH - (x - PAGE.MARGIN_LEFT);
+
+  // 如果调用方显式指定 indent=false，强制不缩进
+  if (opts.indent === false) {
+    doc.font(font).fontSize(fontSize).fillColor(color)
+      .text(text, x, doc.y, { width });
+    return;
+  }
+
+  const segments = parseBodySegments(text);
+
+  for (const seg of segments) {
+    const displayText = seg.isNumbered
+      ? seg.content
+      : INDENT_PREFIX + seg.content;
+    doc.font(font).fontSize(fontSize).fillColor(color)
+      .text(displayText, x, doc.y, { width });
+  }
+}
+
+
+
 // ========== 后处理：添加页眉页脚 ==========
 export function postProcessPages(doc: PDFDoc, reportId: string, moduleName: string): void {
   const range = doc.bufferedPageRange();

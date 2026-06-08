@@ -4,7 +4,7 @@ import {
   LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
   drawH1, drawCodeBlock, drawSeverityTag, drawLineTag,
-  drawTable, drawSeverityBar,
+  drawTable, drawSeverityBar, drawBodyText,
   ensureSpace, postProcessPages,
   SEVERITY_ZH, FONT_SIZES,
 } from '../pdfCommon.js'
@@ -216,8 +216,7 @@ function drawVulnCard(
   if (item.description) {
     const descH = doc.font(songFont).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: PAGE.CONTENT_WIDTH })
     ensureSpace(doc, Math.min(descH + 10, 80))
-    doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.description, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+    drawBodyText(doc, item.description, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
     doc.moveDown(0.3)
   }
 
@@ -249,8 +248,7 @@ function drawVulnCard(
     ensureSpace(doc, 40)
     doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple)
       .text('概念验证(PoC)描述:', PAGE.MARGIN_LEFT)
-    doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.poc_description, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+    drawBodyText(doc, item.poc_description, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
     doc.moveDown(0.3)
   }
 
@@ -273,8 +271,7 @@ function drawVulnCard(
     ensureSpace(doc, Math.min(stepsH + 20, 60))
     doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple)
       .text('复现步骤:', PAGE.MARGIN_LEFT)
-    doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.reproduce_steps, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+    drawBodyText(doc, item.reproduce_steps, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
     doc.moveDown(0.3)
   }
 
@@ -306,16 +303,14 @@ function drawVulnCard(
     ensureSpace(doc, 40)
     doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green)
       .text('修复建议:', PAGE.MARGIN_LEFT)
-    doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.fix_description, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+    drawBodyText(doc, item.fix_description, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
     doc.moveDown(0.3)
   } else if (item.fix_suggestion) {
     const fixH = doc.font(songFont).fontSize(FONT_SIZES.body).heightOfString(item.fix_suggestion, { width: PAGE.CONTENT_WIDTH })
     ensureSpace(doc, Math.min(fixH + 20, 60))
     doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green)
       .text('修复建议:', PAGE.MARGIN_LEFT)
-    doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.fix_suggestion, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH })
+    drawBodyText(doc, item.fix_suggestion, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH })
     doc.moveDown(0.3)
   }
 

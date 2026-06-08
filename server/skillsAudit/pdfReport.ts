@@ -3,7 +3,7 @@ import type { Response } from 'express'
 import {
   LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
-  drawH1, drawCodeBlock, drawSeverityTag, drawLineTag,
+  drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawBodyText,
   drawTable, drawSeverityBar,
   ensureSpace, postProcessPages,
   SEVERITY_ZH, FONT_SIZES,
@@ -315,8 +315,7 @@ function drawFindingCard(
   if (item.description) {
     const descH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: contentW })
     ensureSpace(doc, Math.min(descH + 10, 80))
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.description, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.description, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 
@@ -324,8 +323,7 @@ function drawFindingCard(
   if (item.evidence) {
     ensureSpace(doc, 40)
     doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple).text('证据:', indent)
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.evidence, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.evidence, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 
@@ -357,8 +355,7 @@ function drawFindingCard(
     const fixH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.remediation, { width: contentW })
     ensureSpace(doc, Math.min(fixH + 20, 60))
     doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green).text('修复建议:', indent)
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.remediation, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.remediation, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 

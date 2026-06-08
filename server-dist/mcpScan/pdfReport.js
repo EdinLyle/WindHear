@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawTable, drawSeverityBar, ensureSpace, postProcessPages, SEVERITY_ZH, STATUS_ZH, FONT_SIZES, } from '../pdfCommon.js';
+import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawBodyText, drawTable, drawSeverityBar, ensureSpace, postProcessPages, SEVERITY_ZH, STATUS_ZH, FONT_SIZES, } from '../pdfCommon.js';
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 /**
  * 生成MCP评估PDF报告并流式输出到HTTP响应
@@ -179,24 +179,21 @@ function drawVulnCard(doc, item, severity, index, reg, mono, aero, song, fang) {
     if (item.description) {
         const descH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: contentW });
         ensureSpace(doc, Math.min(descH + 10, 80));
-        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.description, indent, doc.y, { width: contentW });
+        drawBodyText(doc, item.description, { x: indent, width: contentW });
         doc.moveDown(0.3);
     }
     // 影响 — 三级标题（四号 方正风雅宋）
     if (item.impact) {
         ensureSpace(doc, 40);
         doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.critical).text('影响:', indent);
-        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.impact, indent, doc.y, { width: contentW });
+        drawBodyText(doc, item.impact, { x: indent, width: contentW });
         doc.moveDown(0.3);
     }
     // 利用方式 — 三级标题
     if (item.exploitation) {
         ensureSpace(doc, 40);
         doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple).text('利用方式:', indent);
-        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.exploitation, indent, doc.y, { width: contentW });
+        drawBodyText(doc, item.exploitation, { x: indent, width: contentW });
         doc.moveDown(0.3);
     }
     // 证据
@@ -233,8 +230,7 @@ function drawVulnCard(doc, item, severity, index, reg, mono, aero, song, fang) {
         const fixH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.remediation, { width: contentW });
         ensureSpace(doc, Math.min(fixH + 20, 60));
         doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green).text('修复方式:', indent);
-        doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.remediation, indent, doc.y, { width: contentW });
+        drawBodyText(doc, item.remediation, { x: indent, width: contentW });
         doc.moveDown(0.3);
     }
     // 分隔线

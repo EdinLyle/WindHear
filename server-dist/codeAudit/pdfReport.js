@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawTable, drawSeverityBar, ensureSpace, postProcessPages, SEVERITY_ZH, FONT_SIZES, } from '../pdfCommon.js';
+import { LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename, drawCoverTitle, drawScoreBoard, drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawTable, drawSeverityBar, drawBodyText, ensureSpace, postProcessPages, SEVERITY_ZH, FONT_SIZES, } from '../pdfCommon.js';
 // 严重度排序
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 /**
@@ -169,8 +169,7 @@ function drawVulnCard(doc, item, severity, index, regFont, monoFont, aeroFont, s
     if (item.description) {
         const descH = doc.font(songFont).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: PAGE.CONTENT_WIDTH });
         ensureSpace(doc, Math.min(descH + 10, 80));
-        doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.description, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+        drawBodyText(doc, item.description, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
         doc.moveDown(0.3);
     }
     // 漏洞代码 — 三级标题（四号 方正风雅宋），行号在标题同行居右
@@ -200,8 +199,7 @@ function drawVulnCard(doc, item, severity, index, regFont, monoFont, aeroFont, s
         ensureSpace(doc, 40);
         doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple)
             .text('概念验证(PoC)描述:', PAGE.MARGIN_LEFT);
-        doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.poc_description, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+        drawBodyText(doc, item.poc_description, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
         doc.moveDown(0.3);
     }
     // PoC代码
@@ -222,8 +220,7 @@ function drawVulnCard(doc, item, severity, index, regFont, monoFont, aeroFont, s
         ensureSpace(doc, Math.min(stepsH + 20, 60));
         doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple)
             .text('复现步骤:', PAGE.MARGIN_LEFT);
-        doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.reproduce_steps, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+        drawBodyText(doc, item.reproduce_steps, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
         doc.moveDown(0.3);
     }
     // 参考修复代码
@@ -253,8 +250,7 @@ function drawVulnCard(doc, item, severity, index, regFont, monoFont, aeroFont, s
         ensureSpace(doc, 40);
         doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green)
             .text('修复建议:', PAGE.MARGIN_LEFT);
-        doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.fix_description, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+        drawBodyText(doc, item.fix_description, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
         doc.moveDown(0.3);
     }
     else if (item.fix_suggestion) {
@@ -262,8 +258,7 @@ function drawVulnCard(doc, item, severity, index, regFont, monoFont, aeroFont, s
         ensureSpace(doc, Math.min(fixH + 20, 60));
         doc.font(fangFont).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green)
             .text('修复建议:', PAGE.MARGIN_LEFT);
-        doc.font(songFont).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-            .text(item.fix_suggestion, PAGE.MARGIN_LEFT, doc.y, { width: PAGE.CONTENT_WIDTH });
+        drawBodyText(doc, item.fix_suggestion, { x: PAGE.MARGIN_LEFT, width: PAGE.CONTENT_WIDTH });
         doc.moveDown(0.3);
     }
     // 分隔线

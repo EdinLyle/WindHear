@@ -3,7 +3,7 @@ import type { Response } from 'express'
 import {
   LIGHT_COLORS, PAGE, registerFonts, contentDisposition, buildReportFilename,
   drawCoverTitle, drawScoreBoard,
-  drawH1, drawCodeBlock, drawSeverityTag, drawLineTag,
+  drawH1, drawCodeBlock, drawSeverityTag, drawLineTag, drawBodyText,
   drawTable, drawSeverityBar,
   ensureSpace, postProcessPages,
   SEVERITY_ZH, STATUS_ZH, FONT_SIZES,
@@ -254,8 +254,7 @@ function drawVulnCard(
   if (item.description) {
     const descH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.description, { width: contentW })
     ensureSpace(doc, Math.min(descH + 10, 80))
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.description, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.description, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 
@@ -263,8 +262,7 @@ function drawVulnCard(
   if (item.impact) {
     ensureSpace(doc, 40)
     doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.critical).text('影响:', indent)
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.impact, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.impact, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 
@@ -272,8 +270,7 @@ function drawVulnCard(
   if (item.exploitation) {
     ensureSpace(doc, 40)
     doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.purple).text('利用方式:', indent)
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.exploitation, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.exploitation, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 
@@ -314,8 +311,7 @@ function drawVulnCard(
     const fixH = doc.font(song).fontSize(FONT_SIZES.body).heightOfString(item.remediation, { width: contentW })
     ensureSpace(doc, Math.min(fixH + 20, 60))
     doc.font(fang).fontSize(FONT_SIZES.h3).fillColor(LIGHT_COLORS.green).text('修复方式:', indent)
-    doc.font(song).fontSize(FONT_SIZES.body).fillColor(LIGHT_COLORS.descText)
-      .text(item.remediation, indent, doc.y, { width: contentW })
+    drawBodyText(doc, item.remediation, { x: indent, width: contentW })
     doc.moveDown(0.3)
   }
 
