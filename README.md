@@ -16,21 +16,26 @@
 - 上传项目源码，自动识别技术栈
 - AI 驱动的漏洞发现与可利用性评审
 - 风险评分与报告生成
+- 支持 HTML / Markdown / PDF 格式报告导出
 - 超时时间可配置（10~600 秒，默认 120 秒）
 
 ### 3. 代码安全审计
 - 多阶段 Pipeline：预处理 → 切片 → Parser → Hunter → Validator → Reporter
 - 基于 CWE 的漏洞分类与严重等级评定
 - 漏洞知识库匹配与修复建议
-- 暗色主题 PDF 报告导出（支持中文字体）
+- 支持 Markdown / HTML / PDF 格式报告导出
+- 亮色精致主题 PDF 报告（封面+评分板+严重度分布+漏洞详情）
+- PDF 正文首行缩进，编号列表自动拆分为每项一行
 - 代码高亮与漏洞位置定位
 - 超时时间可配置（10~600 秒，默认 90 秒）
 
 ### 4. Skills 安全审计
 - AI Agent 技能安全审计，评估模型工具调用能力的安全性
+- 10 个专业化 Agent 覆盖 20 种风险类型（正则扫描 + LLM 双重验证）
 - 多维度风险评估：注入攻击、越权操作、信息泄露等
 - 风险评分与等级评定
-- 支持 Markdown / HTML / PDF 报告导出
+- 支持 Markdown / HTML / PDF 格式报告导出
+- PDF 正文首行缩进，编号列表自动拆分为每项一行
 - 超时时间可配置（10~600 秒，默认 90 秒）
 
 ## 其他功能
@@ -47,7 +52,7 @@
 | 后端 | Express 5 + TypeScript (NodeNext) |
 | 数据库 | SQLite3 |
 | AI 接口 | Ollama / OpenAI / Anthropic / 智谱GLM |
-| PDF 生成 | PDFKit + NotoSansSC 中文字体 |
+| PDF 生成 | PDFKit + 多字体体系（宋体/方正风雅宋/航天腾飞体/TNR/NotoSansMono） |
 | 校验 | Zod |
 
 ## 项目结构
@@ -82,10 +87,12 @@ WindHear/
 │   ├── index.ts              # Express 路由与 API 入口
 │   ├── db.ts                 # SQLite 数据库初始化与迁移
 │   ├── modelClients.ts       # 多 LLM Provider 适配（Ollama/OpenAI/Anthropic/智谱GLM）
+│   ├── pdfCommon.ts          # PDF 公共模块（字体注册/页眉页脚/正文渲染/代码块/表格/统一文件名）
 │   ├── runner.ts             # 模型评测执行引擎
 │   ├── mcpScanner.ts         # MCP 扫描编排
 │   ├── mcpScanStore.ts       # MCP 扫描数据持久化
 │   ├── mcpScan/              # MCP 扫描子模块
+│   │   ├── pdfReport.ts      # PDF 报告生成
 │   │   ├── stages/           # 分析、审计、评审、报告阶段
 │   │   └── util/             # 文件遍历、LLM 适配、项目识别等工具
 │   ├── codeAudit/            # 代码安全审计子模块
@@ -93,16 +100,18 @@ WindHear/
 │   │   ├── preprocessor.ts   # 项目预处理与代码切片
 │   │   ├── slicer.ts         # 智能代码分块
 │   │   ├── agents.ts         # AI Agent（Parser/Hunter/Validator/Reporter）
-│   │   ├── pdfReport.ts      # PDF 报告生成
+│   │   ├── pdfReport.ts      # PDF 报告生成（漏洞详情）
+│   │   ├── evalPdfReport.ts  # PDF 报告生成（模型评估）
 │   │   └── types.ts          # 审计类型定义
 │   ├── codeAuditStore.ts     # 代码安全审计数据持久化
 │   ├── skillsAudit/          # Skills 安全审计子模块
 │   │   ├── pipeline.ts       # 审计流水线编排
-│   │   ├── agents.ts         # AI Agent 集群
+│   │   ├── agents.ts         # AI Agent 集群（10个专业化Agent）
 │   │   ├── pdfReport.ts      # PDF 报告生成
+│   │   ├── stages/           # 正则扫描阶段
 │   │   └── types.ts          # 审计类型定义
 │   ├── skillsAuditStore.ts   # Skills 审计数据持久化
-│   └── fonts/                # NotoSansSC 中文字体
+│   └── fonts/                # 中英文字体（宋体/风雅宋/航天腾飞体/TNR/NotoSansMono等）
 ├── data/                     # SQLite 数据库文件
 ├── img/                      # 截图与文档图片
 ├── CHANGELOG.json            # 更新日志数据（版本号唯一数据源）
