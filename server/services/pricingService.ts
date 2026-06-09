@@ -19,15 +19,28 @@ export function getModelPricing(provider: string, model: string): ModelPricing |
 export function estimateCost(usage: TokenUsage, customPricing?: PricingData): CostEstimate {
   const data = customPricing ?? pricing
   const providerPricing = data[usage.provider]
-  if (!providerPricing) {
-    return { amount: null, currency: 'UNMAPPED' }
+  if (providerPricing) {
+    const modelPricing = providerPricing[usage.model]
+    if (modelPricing) {
+      // 精确匹配成功
+      return calcCost(usage, modelPricing)
+    }
   }
 
-  const modelPricing = providerPricing[usage.model]
-  if (!modelPricing) {
-    return { amount: null, currency: 'UNMAPPED' }
+  // 精确匹配失败：按 model 名称在所有 provider 下查找
+  // 例如 provider='openai' + model='deepseek-v4-flash' → 在 deepseek 下查找
+  for (const [, providerModels] of Object.entries(data)) {
+    const modelPricing = providerModels[usage.model]
+    if (modelPricing) {
+      return calcCost(usage, modelPricing)
+    }
   }
 
+  return { amount: null, currency: 'UNMAPPED' }
+}
+
+/** 根据定价计算成本 */
+function calcCost(usage: TokenUsage, modelPricing: ModelPricing): CostEstimate {
   let inputCost: number
 
   // DeepSeek 特殊处理：缓存命中/未命中分别计价

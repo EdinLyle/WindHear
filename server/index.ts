@@ -2428,8 +2428,8 @@ function generateSkillsAuditHtml(data: any, audit: any): string {
 }
 
 import { getTokenUsagesByTaskId, getTokenUsagesBySessionId } from './db.js'
-import { getPricingData, getSupportedModels } from './services/pricingService.js'
-import type { TokenReceiptData, TokenUsageRow } from './types.js'
+import { estimateCost, getPricingData, getSupportedModels } from './services/pricingService.js'
+import type { TokenReceiptData, TokenUsageRow, TokenUsage } from './types.js'
 
 // ─── Token 小票 & 价格 API ───────────────────────────────────────────
 
@@ -2480,8 +2480,30 @@ app.get('/api/pricing/models', (_req, res) => {
   })
 })
 
-/** 辅助：DB 行 → TokenReceiptData */
+/** 辅助：DB 行 → TokenReceiptData（若 cost 为空则重新计算） */
 function rowToReceipt(row: TokenUsageRow): TokenReceiptData {
+  let costAmount = row.cost_amount
+  let costCurrency: 'USD' | 'CNY' | 'UNMAPPED' = (row.cost_currency as 'USD' | 'CNY' | 'UNMAPPED') ?? 'UNMAPPED'
+
+  // 若 DB 中无费用数据，尝试重新计算
+  if (costAmount == null || costCurrency === 'UNMAPPED') {
+    const usage: TokenUsage = {
+      taskId: row.task_id,
+      module: row.module,
+      provider: row.provider,
+      model: row.model,
+      inputTokens: row.input_tokens,
+      outputTokens: row.output_tokens,
+      cachedInputTokens: row.cached_input_tokens ?? undefined,
+      reasoningTokens: row.reasoning_tokens ?? undefined,
+      totalTokens: row.total_tokens,
+      timestamp: row.timestamp,
+    }
+    const cost = estimateCost(usage)
+    costAmount = cost.amount
+    costCurrency = cost.currency as 'USD' | 'CNY' | 'UNMAPPED'
+  }
+
   return {
     taskId: row.task_id,
     sessionId: row.session_id ?? '',
@@ -2493,8 +2515,8 @@ function rowToReceipt(row: TokenUsageRow): TokenReceiptData {
     cachedInputTokens: row.cached_input_tokens ?? undefined,
     reasoningTokens: row.reasoning_tokens ?? undefined,
     totalTokens: row.total_tokens,
-    costAmount: row.cost_amount,
-    costCurrency: (row.cost_currency as 'USD' | 'CNY') ?? 'UNMAPPED',
+    costAmount,
+    costCurrency,
     timestamp: row.timestamp,
     receiptId: `R-${row.id.toString().padStart(8, '0')}`,
   }

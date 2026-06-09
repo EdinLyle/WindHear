@@ -2083,7 +2083,7 @@ function generateSkillsAuditHtml(data, audit) {
 </html>`;
 }
 import { getTokenUsagesByTaskId, getTokenUsagesBySessionId } from './db.js';
-import { getPricingData, getSupportedModels } from './services/pricingService.js';
+import { estimateCost, getPricingData, getSupportedModels } from './services/pricingService.js';
 // ─── Token 小票 & 价格 API ───────────────────────────────────────────
 /** 按 taskId 获取 Token 消耗小票 */
 app.get('/api/receipt/:taskId', async (req, res) => {
@@ -2131,8 +2131,28 @@ app.get('/api/pricing/models', (_req, res) => {
         pricing: getPricingData(),
     });
 });
-/** 辅助：DB 行 → TokenReceiptData */
+/** 辅助：DB 行 → TokenReceiptData（若 cost 为空则重新计算） */
 function rowToReceipt(row) {
+    let costAmount = row.cost_amount;
+    let costCurrency = row.cost_currency ?? 'UNMAPPED';
+    // 若 DB 中无费用数据，尝试重新计算
+    if (costAmount == null || costCurrency === 'UNMAPPED') {
+        const usage = {
+            taskId: row.task_id,
+            module: row.module,
+            provider: row.provider,
+            model: row.model,
+            inputTokens: row.input_tokens,
+            outputTokens: row.output_tokens,
+            cachedInputTokens: row.cached_input_tokens ?? undefined,
+            reasoningTokens: row.reasoning_tokens ?? undefined,
+            totalTokens: row.total_tokens,
+            timestamp: row.timestamp,
+        };
+        const cost = estimateCost(usage);
+        costAmount = cost.amount;
+        costCurrency = cost.currency;
+    }
     return {
         taskId: row.task_id,
         sessionId: row.session_id ?? '',
@@ -2144,8 +2164,8 @@ function rowToReceipt(row) {
         cachedInputTokens: row.cached_input_tokens ?? undefined,
         reasoningTokens: row.reasoning_tokens ?? undefined,
         totalTokens: row.total_tokens,
-        costAmount: row.cost_amount,
-        costCurrency: row.cost_currency ?? 'UNMAPPED',
+        costAmount,
+        costCurrency,
         timestamp: row.timestamp,
         receiptId: `R-${row.id.toString().padStart(8, '0')}`,
     };
