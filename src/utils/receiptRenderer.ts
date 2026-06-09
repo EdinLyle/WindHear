@@ -126,29 +126,23 @@ function formatNumber(n: number): string {
   return n.toLocaleString('en-US')
 }
 
-/** 生成 ASCII 条形码（基于 receiptId 哈希，视觉上像真实条形码） */
+/** 生成 ASCII 条形码（基于 receiptId，视觉上像真实条形码） */
 function generateBarcode(receiptId: string): string {
-  // 简单哈希：将 receiptId 转为数字种子
-  let hash = 0
+  // 基于 receiptId 生成确定性的条形码模式
+  // 使用简单的伪随机序列，确保条形码密集且美观
+  let seed = 0
   for (let i = 0; i < receiptId.length; i++) {
-    hash = ((hash << 5) - hash + receiptId.charCodeAt(i)) | 0
+    seed = ((seed << 5) - seed + receiptId.charCodeAt(i)) | 0
   }
-  // 用哈希生成条形码模式：交替的粗细条纹
+  // 确保种子为正数
+  seed = Math.abs(seed) || 1
+
+  const patterns = ['|||', '||', '||| ', '|| ', '|', '|| ', '|||', '|| ', '| ', '||| ', '||', '||| ', '| ', '||', '||| ']
   let barcode = ''
-  let pos = 0
-  while (pos < LINE_WIDTH) {
-    const bit = (hash >> (pos % 16)) & 1
-    if (bit || pos % 3 === 0) {
-      const barWidth = 1 + (Math.abs(hash >> (pos % 8)) % 2)
-      for (let b = 0; b < barWidth && pos < LINE_WIDTH; b++) {
-        barcode += '|'
-        pos++
-      }
-    } else {
-      barcode += ' '
-      pos += 1
-    }
-    hash = (hash * 31 + pos) | 0
+  let idx = seed % patterns.length
+  while (barcode.length < LINE_WIDTH) {
+    barcode += patterns[idx % patterns.length]
+    idx = (idx * 7 + 3) % patterns.length
   }
   return barcode.substring(0, LINE_WIDTH)
 }
@@ -162,11 +156,9 @@ function formatCost(amount: number | null, currency: string): string {
   return `UNMAPPED`
 }
 
-/** 居中文本（考虑显示宽度） */
-function centerText(text: string, width: number = LINE_WIDTH): string {
-  const textWidth = getStringWidth(text)
-  const leftPad = Math.max(0, Math.floor((width - textWidth) / 2))
-  return ' '.repeat(leftPad) + text
+/** 居中文本（由 CSS text-align:center 处理，此处直接返回原文） */
+function centerText(text: string): string {
+  return text
 }
 
 /** 获取 provider 对应的 Logo */

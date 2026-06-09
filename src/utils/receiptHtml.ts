@@ -117,13 +117,21 @@ function formatDate(timestamp: string): string {
 }
 
 function generateBarcode(receiptId: string): string {
-  const chars = receiptId.split('')
-  let barcode = '   '
-  for (const ch of chars) {
-    barcode += ch.charCodeAt(0).toString(2).slice(-4).replace(/0/g, ' ').replace(/1/g, '|')
-    barcode += ' '
+  // 基于 receiptId 生成确定性的条形码模式
+  let seed = 0
+  for (let i = 0; i < receiptId.length; i++) {
+    seed = ((seed << 5) - seed + receiptId.charCodeAt(i)) | 0
   }
-  return barcode
+  seed = Math.abs(seed) || 1
+
+  const patterns = ['|||', '||', '||| ', '|| ', '|', '|| ', '|||', '|| ', '| ', '||| ', '||', '||| ', '| ', '||', '||| ']
+  let barcode = ''
+  let idx = seed % patterns.length
+  while (barcode.length < 48) {
+    barcode += patterns[idx % patterns.length]
+    idx = (idx * 7 + 3) % patterns.length
+  }
+  return barcode.substring(0, 48)
 }
 
 function escHtml(str: string): string {
