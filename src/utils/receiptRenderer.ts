@@ -126,15 +126,31 @@ function formatNumber(n: number): string {
   return n.toLocaleString('en-US')
 }
 
-/** 生成 ASCII 条形码 */
+/** 生成 ASCII 条形码（基于 receiptId 哈希，视觉上像真实条形码） */
 function generateBarcode(receiptId: string): string {
-  const chars = receiptId.split('')
-  let barcode = '   '
-  for (const ch of chars) {
-    barcode += ch.charCodeAt(0).toString(2).slice(-4).replace(/0/g, ' ').replace(/1/g, '|')
-    barcode += ' '
+  // 简单哈希：将 receiptId 转为数字种子
+  let hash = 0
+  for (let i = 0; i < receiptId.length; i++) {
+    hash = ((hash << 5) - hash + receiptId.charCodeAt(i)) | 0
   }
-  return barcode
+  // 用哈希生成条形码模式：交替的粗细条纹
+  let barcode = ''
+  let pos = 0
+  while (pos < LINE_WIDTH) {
+    const bit = (hash >> (pos % 16)) & 1
+    if (bit || pos % 3 === 0) {
+      const barWidth = 1 + (Math.abs(hash >> (pos % 8)) % 2)
+      for (let b = 0; b < barWidth && pos < LINE_WIDTH; b++) {
+        barcode += '|'
+        pos++
+      }
+    } else {
+      barcode += ' '
+      pos += 1
+    }
+    hash = (hash * 31 + pos) | 0
+  }
+  return barcode.substring(0, LINE_WIDTH)
 }
 
 /** 价格显示 */
@@ -190,9 +206,9 @@ export function renderAsciiReceipt(
 
   const lines: string[] = []
 
-  // Logo
+  // Logo - 每行居中
   const logo = getLogo(data.provider)
-  lines.push(logo)
+  lines.push(...logo.split('\n').map(line => centerText(line)))
 
   // 空行
   lines.push('')
@@ -203,13 +219,13 @@ export function renderAsciiReceipt(
     : 'THANK YOU FOR AUDITING WITH WindHear'
   lines.push(centerText(title))
 
-  // Receipt ID
-  const receiptIdLabel = language === 'zh' ? '    小票编号: ' : '    RECEIPT #: '
-  lines.push(receiptIdLabel + data.receiptId)
+  // Receipt ID（居中）
+  const receiptIdLine = language === 'zh' ? `小票编号: ${data.receiptId}` : `RECEIPT #: ${data.receiptId}`
+  lines.push(centerText(receiptIdLine))
 
-  // Date
-  const dateLabel = language === 'zh' ? '         日期: ' : '         DATE: '
-  lines.push(dateLabel + formatDate(data.timestamp))
+  // Date（居中）
+  const dateLine = language === 'zh' ? `日期: ${formatDate(data.timestamp)}` : `DATE: ${formatDate(data.timestamp)}`
+  lines.push(centerText(dateLine))
 
   // 双线分隔
   lines.push(thickLine)
@@ -314,7 +330,7 @@ export function renderAsciiReceipt(
 
   // 条形码
   lines.push('')
-  lines.push(generateBarcode(data.receiptId))
+  lines.push(centerText(generateBarcode(data.receiptId)))
   lines.push(centerText(data.receiptId))
 
   return lines.join('\n')
