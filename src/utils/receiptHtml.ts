@@ -203,6 +203,7 @@ export function generateHtmlReceipt(
     .receipt-divider-thick { border-top: 3px solid #1a1a1a; margin: 10px 0; }
     .receipt-divider-thin { border-top: 1px solid #999; margin: 8px 0; }
     .receipt-row { display: flex; justify-content: space-between; margin: 4px 0; }
+    .receipt-row span { white-space: nowrap; }
     .receipt-total { font-weight: bold; font-size: 16px; }
     .receipt-price { color: #1a73e8; }
     .receipt-footer { text-align: center; margin-top: 16px; font-style: italic; color: #666; font-size: 13px; }
@@ -335,22 +336,20 @@ export function generateReceiptHtmlFragment(
   data: TokenReceiptData,
   language: 'zh' | 'en' = 'zh'
 ): string {
-  // 复用 generateHtmlReceipt 的核心逻辑，但只输出 .receipt 容器部分
-  // 最简洁的方式：调用 generateHtmlReceipt，然后提取 .receipt 内容
+  // 复用 generateHtmlReceipt 的核心逻辑，输出包含样式的 .receipt 容器片段
   const fullHtml = generateHtmlReceipt(data, language)
 
-  // 提取 .receipt 容器的内容（不含 <div class="receipt"> 标签本身）
-  const receiptMatch = fullHtml.match(/<div class="receipt"[^>]*>([\s\S]*?)<\/div>\s*<div class="lang-toggle"/)
+  // 提取 <style> 标签内容
+  const styleMatch = fullHtml.match(/<style>([\s\S]*?)<\/style>/)
+  const styleContent = styleMatch ? styleMatch[1] : ''
+
+  // 提取 .receipt div（包含自身标签），到 lang-toggle 之前
+  const receiptMatch = fullHtml.match(/<div class="receipt"[\s\S]*?<\/div>\s*(?:<div class="lang-toggle")/)
   if (receiptMatch) {
-    return receiptMatch[1]
+    const receiptHtml = receiptMatch[0].replace(/\s*<div class="lang-toggle"[\s\S]*$/, '')
+    return `<style>${styleContent}</style>${receiptHtml}`
   }
 
-  // 备选：提取整个 .receipt div（包含自身标签）
-  const divMatch = fullHtml.match(/<div class="receipt"[\s\S]*?<\/div>\s*(?:<div class="lang-toggle")/)
-  if (divMatch) {
-    return divMatch[0].replace(/\s*<div class="lang-toggle"[\s\S]*$/, '')
-  }
-
-  // 最终回退：返回完整 HTML（不应到这里）
+  // 最终回退：返回完整 HTML
   return fullHtml
 }
