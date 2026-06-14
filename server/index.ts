@@ -1748,6 +1748,17 @@ app.delete('/api/code-audit/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+app.post('/api/code-audit/bulk-delete', async (req, res) => {
+  const schema = z.object({ ids: z.array(z.number().int().positive()).min(1) })
+  const parsed = schema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message })
+    return
+  }
+  await codeAuditStore.bulkDelete(parsed.data.ids)
+  res.json({ ok: true })
+})
+
 app.get('/api/code-audit/:id/report', async (req, res) => {
   const auditId = Number(req.params.id)
   const audit = await codeAuditStore.getAudit(auditId)
@@ -2313,6 +2324,17 @@ app.get('/api/skills-audit/:id/report', async (req, res) => {
 app.delete('/api/skills-audit/:id', async (req, res) => {
   const id = Number(req.params.id)
   await skillsAuditStore.deleteAudit(id)
+  res.json({ ok: true })
+})
+
+app.post('/api/skills-audit/bulk-delete', async (req, res) => {
+  const schema = z.object({ ids: z.array(z.number().int().positive()).min(1) })
+  const parsed = schema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message })
+    return
+  }
+  await skillsAuditStore.bulkDelete(parsed.data.ids)
   res.json({ ok: true })
 })
 

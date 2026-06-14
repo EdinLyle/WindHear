@@ -119,6 +119,15 @@ export class SkillsAuditStore {
     await this.db.run('DELETE FROM skills_audits WHERE id = ?', id)
   }
 
+  async bulkDelete(ids: number[]) {
+    if (ids.length === 0) return
+    const ph = ids.map(() => '?').join(',')
+    await this.db.run(`DELETE FROM skills_audit_items WHERE audit_id IN (${ph})`, ids)
+    await this.db.run(`DELETE FROM skills_audit_logs WHERE audit_id IN (${ph})`, ids)
+    await this.db.run(`DELETE FROM skills_audit_reports WHERE audit_id IN (${ph})`, ids)
+    await this.db.run(`DELETE FROM skills_audits WHERE id IN (${ph})`, ids)
+  }
+
   // ===== 审计发现项 =====
 
   async createItem(input: {

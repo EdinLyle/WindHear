@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { deleteCodeAudit, listCodeAudits } from '../api'
+import { bulkDeleteCodeAudits, deleteCodeAudit, listCodeAudits } from '../api'
 import type { CodeAuditListItem } from '../types'
 import { Breadcrumb } from '../components/Breadcrumb'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -49,7 +49,10 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const [language, setLanguage] = useState('all')
+  const [selected, setSelected] = useState<Record<number, boolean>>({})
+  const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[Number(k)]).map(Number), [selected])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogType, setDialogType] = useState<'single' | 'batch' | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -62,6 +65,7 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
       const resp = await listCodeAudits(p, PAGE_SIZE, { query: q || undefined, language: lang !== 'all' ? lang : undefined })
       setItems(resp.items)
       setTotal(resp.total)
+      setSelected({})
     } catch { /* ignore */ }
     setLoading(false)
   }, [page, query, language])
@@ -83,15 +87,36 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
 
   async function onDelete(id: number) {
     setPendingDeleteId(id)
+    setDialogType('single')
+    setDialogOpen(true)
+  }
+
+  async function onBulkDelete() {
+    if (selectedIds.length === 0) return
+    setDialogType('batch')
     setDialogOpen(true)
   }
 
   async function onConfirmDelete() {
-    if (pendingDeleteId == null) return
-    await deleteCodeAudit(pendingDeleteId)
+    if (dialogType === 'single' && pendingDeleteId != null) {
+      await deleteCodeAudit(pendingDeleteId)
+      setDialogOpen(false)
+      setDialogType(null)
+      setPendingDeleteId(null)
+      void refresh()
+    } else if (dialogType === 'batch') {
+      await bulkDeleteCodeAudits(selectedIds)
+      setDialogOpen(false)
+      setDialogType(null)
+      setPage(1)
+      await refresh(1)
+    }
+  }
+
+  function onDialogCancel() {
     setDialogOpen(false)
+    setDialogType(null)
     setPendingDeleteId(null)
-    void refresh()
   }
 
   const stats = useMemo(() => {
@@ -130,6 +155,11 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
           <div className="muted" style={{ fontSize: 13 }}>
             共 {total} 条记录
+            {selectedIds.length > 0 && (
+              <button className="btn danger sm" onClick={onBulkDelete} disabled={loading} style={{ marginLeft: 12 }}>
+                批量删除（{selectedIds.length}）
+              </button>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div style={{ position: 'relative', width: 220, flexShrink: 0 }}>
@@ -173,6 +203,19 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
         <table className="table" style={{ tableLayout: 'fixed' }}>
           <thead>
             <tr>
+              <th style={{ width: 40 }}>
+                <input
+                  type="checkbox"
+                  checked={items.length > 0 && items.every((it) => !!selected[it.id])}
+                  onChange={(e) => {
+                    setSelected((prev) => {
+                      const next: Record<number, boolean> = { ...prev }
+                      for (const it of items) next[it.id] = e.target.checked
+                      return next
+                    })
+                  }}
+                />
+              </th>
               <th style={{ width: 140 }}>创建时间</th>
               <th>任务名称</th>
               <th style={{ width: 80 }}>来源</th>
@@ -185,14 +228,21 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 32 }}>加载中...</td></tr>
+              <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 32 }}>加载中...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 32 }}>
+              <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 32 }}>
                 暂无审计数据，<Link to="/code-audit/create">创建第一个审计任务</Link>
               </td></tr>
             ) : (
               items.map(item => (
                 <tr key={item.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={!!selected[item.id]}
+                      onChange={(e) => setSelected((s) => ({ ...s, [item.id]: e.target.checked }))}
+                    />
+                  </td>
                   <td className="muted" style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
                     {formatTimestamp(item.createdAt)}
                   </td>
@@ -241,9 +291,9 @@ export function CodeAuditList({ hideBreadcrumb }: { hideBreadcrumb?: boolean } =
       </section>
       <ConfirmDialog
         open={dialogOpen}
-        message="确定要删除这条审计记录吗？"
+        message={dialogType === 'batch' ? `确定要删除选中的 ${selectedIds.length} 条审计记录吗？` : '确定要删除这条审计记录吗？'}
         onConfirm={onConfirmDelete}
-        onCancel={() => { setDialogOpen(false); setPendingDeleteId(null) }}
+        onCancel={onDialogCancel}
       />
     </div>
   )

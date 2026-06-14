@@ -104,6 +104,15 @@ export class CodeAuditStore {
     await this.db.run('DELETE FROM code_audits WHERE id = ?', id)
   }
 
+  async bulkDelete(ids: number[]) {
+    if (ids.length === 0) return
+    const ph = ids.map(() => '?').join(',')
+    await this.db.run(`DELETE FROM code_audit_items WHERE audit_id IN (${ph})`, ids)
+    await this.db.run(`DELETE FROM code_audit_logs WHERE audit_id IN (${ph})`, ids)
+    await this.db.run(`DELETE FROM code_slices WHERE audit_id IN (${ph})`, ids)
+    await this.db.run(`DELETE FROM code_audits WHERE id IN (${ph})`, ids)
+  }
+
   // ===== 代码切片 =====
 
   async createSlice(input: {

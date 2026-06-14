@@ -373,6 +373,13 @@ export function deleteCodeAudit(id: number) {
   return apiFetch<{ ok: true }>(`/api/code-audit/${id}`, { method: 'DELETE' })
 }
 
+export function bulkDeleteCodeAudits(ids: number[]) {
+  return apiFetch<{ ok: true }>('/api/code-audit/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  })
+}
+
 export function getCodeAuditReport(id: number, format: 'html' | 'pdf' = 'pdf') {
   if (format === 'pdf') {
     window.open(`/api/code-audit/${id}/report?format=pdf`, '_blank')
@@ -478,6 +485,13 @@ export function getSkillsAuditReport(id: number, format: 'html' | 'md' | 'pdf' =
 
 export function deleteSkillsAudit(id: number) {
   return apiFetch<{ ok: true }>(`/api/skills-audit/${id}`, { method: 'DELETE' })
+}
+
+export function bulkDeleteSkillsAudits(ids: number[]) {
+  return apiFetch<{ ok: true }>('/api/skills-audit/bulk-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  })
 }
 
 // ===== Token Receipt API =====
