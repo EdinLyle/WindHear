@@ -65,7 +65,9 @@ async function llmAudit(
   "cweName": "CWE名称"
 }]
 
-如果没有发现，返回: []`
+如果没有发现，返回: []
+
+语言要求：所有描述性文本（description、evidence、remediation、title等）必须使用中文。关键词、命令、代码片段、CWE编号、文件路径、技术术语保持英文。`
 
   // Layer3: 用户策略追加增强
   const parts = [systemPrompt]

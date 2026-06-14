@@ -1,7 +1,29 @@
 [
   {
+    "version": "V1.6.4",
+    "date": "2026-06-14",
+    "changes": [
+      { "type": "fix", "text": "修复 ASCII Logo显示错误：getLogo仅按provider匹配，DeepSeek走openai接口显示OpenAI Logo，改为按model名称推断provider" },
+      { "type": "improve", "text": "优化 代码审计/Skills审计LLM输出中文：buildSystemPrompt增加中文约束层，Hunter userPrompt追加中文规则，skillsAudit systemPrompt追加语言要求" }
+    ]
+  },
+  {
+    "version": "V1.6.3",
+    "date": "2026-06-11",
+    "changes": [
+      { "type": "feature", "text": "新增 Token消耗可视化小票功能：数据采集（modelClients扩展usage提取+recordTokenUsage集中埋点+token_usages表）、价格估算（pricingService多供应商多币种）、API端点（receipt/pricing）、前端渲染（ASCII热敏纸+HTML小票+PNG导出）、四模块集成弹窗" },
+      { "type": "feature", "text": "新增 pricing.json 价格表：OpenAI/Anthropic/智谱/DeepSeek四供应商，DeepSeek支持缓存命中/未命中差异化计价" },
+      { "type": "improve", "text": "优化 小票弹窗视觉：380px热敏纸宽度、CSS text-align:center全局居中、ASCII Logo/条形码居中、弹窗尺寸匹配HTML小票" },
+      { "type": "fix", "text": "修复 条形码生成算法：原ASCII码低4位导致数字0全空格，改为基于receiptId哈希的密集条纹模式" },
+      { "type": "fix", "text": "修复 PNG导出空白：html-to-image无法渲染opacity:0元素，改为z-index:-1可见容器+document.head注入CSS样式" },
+      { "type": "fix", "text": "修复 PNG导出布局混乱：generateReceiptHtmlFragment缺少<style>标签，改为同时提取CSS样式+注入head确保flex布局生效" },
+      { "type": "fix", "text": "修复 PNG导出'项目''合计'垂直排列：.receipt-row span缺少white-space:nowrap，CJK两字span在flex中换行" },
+      { "type": "fix", "text": "修复 费用估算显示UNMAPPED：provider枚举缺少deepseek导致价格表匹配失败，estimateCost增加按model名称跨provider查找+rowToReceipt对旧记录重新计算" }
+    ]
+  },
+  {
     "version": "V1.6.0",
-    "date": "2026-06-07",
+    "date": "2026-06-09",
     "changes": [
       { "type": "fix", "text": "修复 PDF报告空白页问题（drawFooter/drawHeader临时调整page.margins.bottom阻止LineWrapper自动换页，4种PDF导出均修复）" },
       { "type": "improve", "text": "优化 四种评估HTML导出统一亮色精致UI（grid kv卡片+表格+footer），对齐前端基准样式" },

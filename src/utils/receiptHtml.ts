@@ -89,9 +89,23 @@ const FOOTERS = {
   ]
 }
 
-function getLogo(provider: string): string {
+function getLogo(provider: string, model?: string): string {
+  // 1. 优先根据 model 名称推断（model 比 provider 更准确，因为 DeepSeek 走 openai 接口）
+  if (model) {
+    const m = model.toLowerCase()
+    if (m.includes('deepseek')) return LOGOS['deepseek']
+    if (m.includes('glm')) return LOGOS['zhipu']
+    if (m.includes('claude')) return LOGOS['anthropic']
+    if (m.includes('gpt') || m.includes('o1') || m.includes('o3') || m.includes('o4') || m.includes('codex')) return LOGOS['openai']
+    if (m.includes('llama') || m.includes('qwen') || m.includes('mistral')) return LOGOS['ollama']
+  }
+
+  // 2. 回退：按 provider 匹配
   const key = provider.toLowerCase()
-  return LOGOS[key] || LOGOS['windhear']
+  if (LOGOS[key]) return LOGOS[key]
+
+  // 3. 默认使用 windhear logo
+  return LOGOS['windhear']
 }
 
 function getModuleName(module: string, language: 'zh' | 'en'): string {
@@ -143,7 +157,7 @@ export function generateHtmlReceipt(
   language: 'zh' | 'en' = 'zh',
 
 ): string {
-  const logo = escHtml(getLogo(data.provider))
+  const logo = escHtml(getLogo(data.provider, data.model))
   const date = formatDate(data.timestamp)
   const dateOnly = date.split(' ')[0]
   const barcode = escHtml(generateBarcode(data.receiptId))

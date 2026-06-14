@@ -4,47 +4,47 @@ const LINE_WIDTH = 48
 
 const LOGOS: Record<string, string> = {
   deepseek: `
-     ▄▄▄▄▄▄▄▄▄    
-   ▄████████████████▄  
-  ▄███▀▀▀▀▀▀▀▀▀▀▀███ 
+      ▄▄▄▄▄▄▄▄▄
+    ▄████████████████▄
+  ▄███▀▀▀▀▀▀▀▀▀▀▀███
   █████ ████ ████ █████
-   ███████████████████ 
-    ▀▀▀████████▀▀▀▀   
-       ▀▀▀▀▀▀        
+    ███████████████████
+    ▀▀▀████████▀▀▀▀
+        ▀▀▀▀▀▀  
        DeepSeek`,
   zhipu: `
-      ▄▄▄▄▄▄▄    
-    ▄██▀▀▀▀▀▀██▄  
-   ▄██ ▄▄▄▄ ▀██▄ 
+      ▄▄▄▄▄▄▄
+    ▄██▀▀▀▀▀▀██▄
+  ▄██ ▄▄▄▄ ▀██▄
   ▄██▀ ▄▀▀▄▀▄ ▀██▄
   ███ ▄▀ ▄▄ ▀▄ █████
   ▀██▄ ▀▄▄▀▄▀ ▄██
-   ▀██▄ ▀▀▀ ▄██ 
-    ▀██▄▄▄▄▄▄██▀  
-      ▀▀▀▀▀▀▀    
+    ▀██▄ ▀▀▀ ▄██
+    ▀██▄▄▄▄▄▄██▀
+      ▀▀▀▀▀▀▀
       Zhipu GLM`,
   anthropic: `
- ▄▄▄▄▄▄       ▄▄▄▄▄▄▄
-███▀▀▀███     ███▀▀▀███
+  ▄▄▄▄▄▄       ▄▄▄▄▄▄▄
+  ███▀▀▀███     ███▀▀▀███
 ███ ▄▄▄ ███   ███ ▄▄▄ ███
- ████████ ███ ████ █████
-  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-       ▄▄▄▄▄▄▄
-     ▄██▀   ▀██▄
-    ▄██▀     ▀██▄
-    ▀▀▀▀▀▀▀▀▀▀▀▀
+  ████████ ███ ████ █████
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+        ▄▄▄▄▄▄▄
+      ▄██▀   ▀██▄
+      ▄██▀     ▀██▄
+      ▀▀▀▀▀▀▀▀▀▀▀▀
     CLAUDE CODE`,
   openai: `
-      ▄▄▄▄▄▄▄▄▄    
-    ▄██████████████▄  
-   ▄██▀▀▀▀▀▀▀▀▀▀▀▀██▄
-  ▄██   ▄▄▄▄▄▄   ▀██▄
- ███▀   ▄▀▀▀▀▄   ▀███
- ███    ████ ████    ███
- ███    ████ ████    ███
- ███▄   ▀▀▀▀▀▀▀   ▄███
+        ▄▄▄▄▄▄▄▄▄
+     ▄██████████████▄
+    ▄██▀▀▀▀▀▀▀▀▀▀▀▀██▄
+  ▄██    ▄▄▄▄▄▄    ▀██▄
+███▀     ▄▀▀▀▀▄     ▀███
+███    ████ ████     ███
+███    ████ ████     ███
+███▄    ▀▀▀▀▀▀▀     ▄███
   ▀██▄▄▄▄▄▄▄▄▄▄▄▄▄██▀
-   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+    ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
        OPENAI`,
   ollama: `
       ▄▄▄▄▄▄▄    
@@ -161,11 +161,23 @@ function centerText(text: string): string {
   return text
 }
 
-/** 获取 provider 对应的 Logo */
-function getLogo(provider: string): string {
+/** 根据 provider 和 model 名称获取对应的 Logo */
+function getLogo(provider: string, model?: string): string {
+  // 1. 优先根据 model 名称推断（model 比 provider 更准确，因为 DeepSeek 走 openai 接口）
+  if (model) {
+    const m = model.toLowerCase()
+    if (m.includes('deepseek')) return LOGOS['deepseek']
+    if (m.includes('glm')) return LOGOS['zhipu']
+    if (m.includes('claude')) return LOGOS['anthropic']
+    if (m.includes('gpt') || m.includes('o1') || m.includes('o3') || m.includes('o4') || m.includes('codex')) return LOGOS['openai']
+    if (m.includes('llama') || m.includes('qwen') || m.includes('mistral')) return LOGOS['ollama']
+  }
+
+  // 2. 回退：按 provider 匹配
   const key = provider.toLowerCase()
   if (LOGOS[key]) return LOGOS[key]
-  // 默认使用 windhear logo
+
+  // 3. 默认使用 windhear logo
   return LOGOS['windhear']
 }
 
@@ -199,7 +211,7 @@ export function renderAsciiReceipt(
   const lines: string[] = []
 
   // Logo - 每行居中
-  const logo = getLogo(data.provider)
+  const logo = getLogo(data.provider, data.model)
   lines.push(...logo.split('\n').map(line => centerText(line)))
 
   // 空行

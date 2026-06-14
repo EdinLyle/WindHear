@@ -1606,7 +1606,7 @@ ${hasExpand ? `<tr><td colspan="8" style="padding:0">
 </head>
 <body>
   <div class="page">
-    <h1>智能漏洞挖掘审计报告</h1>
+    <h1>代码安全审计报告</h1>
 
     <h2>基本信息</h2>
     <div class="meta">

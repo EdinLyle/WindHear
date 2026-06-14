@@ -63,7 +63,7 @@ export function generatePdfReport(data, res) {
  */
 function drawCoverPage(doc, data, regFont, aeroFont, songFont, fangFont, tnrFont) {
     // 封面主标题：二号 航天腾飞体 居中
-    drawCoverTitle(doc, '智能漏洞挖掘审计报告', `${data.name}-${new Date().toLocaleString('zh-CN')}`);
+    drawCoverTitle(doc, '代码安全审计报告', `${data.name}-${new Date().toLocaleString('zh-CN')}`);
     // 评分板 — 从y=280开始，避免与封面标题重叠
     doc.y = 300;
     drawScoreBoard(doc, {

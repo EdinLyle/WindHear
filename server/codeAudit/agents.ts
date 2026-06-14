@@ -17,7 +17,8 @@ function buildSystemPrompt(
   outputFormat: string,
   userStrategy?: string,
 ): string {
-  const parts = [agentRole, outputFormat]
+  const chineseConstraint = '语言要求：所有描述性文本（reason、description、fixSuggestion、validationReason、pocDescription、reproduceSteps等）必须使用中文。关键词、命令、代码片段、CWE编号、文件路径、技术术语保持英文。'
+  const parts = [agentRole, outputFormat, chineseConstraint]
   if (userStrategy?.trim()) {
     parts.push(`【用户审计策略】\n${userStrategy.trim()}`)
   }
@@ -171,6 +172,7 @@ ${parserInfo}
 4. 如果无法生成某字段，请输出空字符串 ""
 5. 如果多个切片涉及同一文件的同一代码段，不要重复报告同一漏洞
 6. 同一漏洞只报告一次，选择包含最完整上下文的切片
+7. description、fixSuggestion、pocDescription、reproduceSteps 等描述性字段必须使用中文，关键词和代码片段保持英文
 
 待审计代码：
 ${slicesDescription}
