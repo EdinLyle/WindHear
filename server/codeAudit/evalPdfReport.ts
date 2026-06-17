@@ -167,7 +167,7 @@ function drawDetailPages(
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const score = item.evaluatorScore
-    const isPass = score != null ? score > 0 : true
+    const isPass = score === 0
 
     ensureSpace(doc, 100)
 

@@ -2699,7 +2699,7 @@ function generateEvaluationMd(evaluation: any, items: any[]): string {
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const score = item.evaluatorScore
-    const isPass = score != null ? score > 0 : true
+    const isPass = score === 0
     lines.push(`### ${i + 1}. ${isPass ? 'PASS' : 'FAIL'} - ${item.riskType || '未知类型'}`)
     if (item.riskSubType) lines.push(`- 子类型: ${item.riskSubType}`)
     lines.push(`- 输入: ${item.inputPrompt || ''}`)
